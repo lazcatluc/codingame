@@ -81,4 +81,11 @@ public class PlayerTest {
 							Arrays.asList(Player.getCard("10H"), Player.getCard("7H"), Player.getCard("5C"), Player.getCard("QC"), Player.getCard("2C"), Player.getCard("4H"), Player.getCard("6D")))
 				.getResult().toString()).isEqualTo("1 3");
 	}
+	
+	@Test
+	public void player1WinsThreeRoundsTest() throws Exception {
+		assertThat(new Player.Battle(Arrays.asList(Player.getCard("AD"), Player.getCard("KC"), Player.getCard("QC")), 
+							Arrays.asList(Player.getCard("KH"), Player.getCard("QS"), Player.getCard("JC"))).getResult().toString())
+				.isEqualTo("1 3");
+	}
 }

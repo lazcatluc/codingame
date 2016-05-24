@@ -27,7 +27,7 @@ class Player {
 		// Write an action using System.out.println()
 		// To debug: System.err.println("Debug messages...");
 
-		System.out.println("PAT");
+		System.out.println(new Battle(player1, player2).getResult());
 	}
 	
 	static class Battle {

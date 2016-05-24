@@ -12,151 +12,20 @@ import java.util.Set;
  **/
 class Player {
 	
-	private static final Map<Integer, Integer> ELEVATORS = new HashMap<>();
-	private static final Set<List<Integer>> BLOCKED_CLONES = new HashSet<>();
-
 	public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        int nbFloors = in.nextInt(); // number of floors
-        int width = in.nextInt(); // width of the area
-        int nbRounds = in.nextInt(); // maximum number of rounds
-        int exitFloor = in.nextInt(); // floor on which the exit is found
-        int exitPos = in.nextInt(); // position of the exit on its floor
-        int nbTotalClones = in.nextInt(); // number of generated clones
-        int nbAdditionalElevators = in.nextInt(); // ignore (always zero)
-        int nbElevators = in.nextInt(); // number of elevators
-        for (int i = 0; i < nbElevators; i++) {
-            int elevatorFloor = in.nextInt(); // floor on which this elevator is found
-            int elevatorPos = in.nextInt(); // position of the elevator on its floor
-            ELEVATORS.put(elevatorFloor, elevatorPos);
+        int n = in.nextInt(); // the number of cards for player 1
+        for (int i = 0; i < n; i++) {
+            String cardp1 = in.next(); // the n cards of player 1
+        }
+        int m = in.nextInt(); // the number of cards for player 2
+        for (int i = 0; i < m; i++) {
+            String cardp2 = in.next(); // the m cards of player 2
         }
 
-        // game loop
-        while (true) {
-            int cloneFloor = in.nextInt(); // floor of the leading clone
-            int clonePos = in.nextInt(); // position of the leading clone on its floor
-            Direction direction = Direction.valueOf(in.next()); // direction of the leading clone: LEFT or RIGHT
-            List<Strategy> strategies = Arrays.asList(
-            		new NoActiveClone(),
-            		new OnTopOfBlockedClone(),
-            		new MovesTowardsExit(exitFloor, exitPos, direction),
-            		new MovesTowardsElevator(direction),
-            		new BlockIfEverythingElseFails()
-        		);
-            // Write an action using System.out.println()
-            // To debug: System.err.println("Debug messages...");
+        // Write an action using System.out.println()
+        // To debug: System.err.println("Debug messages...");
 
-            System.out.println(strategies.stream().filter(strategy -> strategy.applies(cloneFloor, clonePos))
-            		.findFirst().get().getAction()); // action: WAIT or BLOCK
-        }
+        System.out.println("PAT");
     }
-	
-	static boolean movingOnRightDirection(Direction direction, int clonePosition, int targetPosition) {
-		int distance = clonePosition - targetPosition;
-		return distance == 0 ||
-			   (direction == Direction.LEFT && distance > 0) ||
-			   (direction == Direction.RIGHT && distance < 0);
-	}
-	
-	interface Strategy {
-		boolean applies(int floor, int position);
-		Action getAction();
-	}
-	
-	static class MovesTowardsExit implements Strategy {
-		private final int exitFloor;
-		private final int exitPosition;
-		private final Direction direction;
-		
-		public MovesTowardsExit(int exitFloor, int exitPosition, Direction direction) {
-			this.exitFloor = exitFloor;
-			this.exitPosition = exitPosition;
-			this.direction = direction;
-		}
-
-		@Override
-		public boolean applies(int floor, int position) {
-			return floor == exitFloor && movingOnRightDirection(direction, position, exitPosition);
-		}
-
-		@Override
-		public Action getAction() {
-			return Action.WAIT;
-		}
-		
-	}
-	
-	static class NoActiveClone implements Strategy {
-
-		@Override
-		public boolean applies(int floor, int position) {
-			return floor == -1;
-		}
-
-		@Override
-		public Action getAction() {
-			return Action.WAIT;
-		}
-		
-	}
-
-	static class MovesTowardsElevator implements Strategy {
-		
-		private final Direction direction;
-		
-		public MovesTowardsElevator(Direction direction) {
-			this.direction = direction;
-		}
-		
-		@Override
-		public boolean applies(int floor, int position) {
-			Integer targetPosition = ELEVATORS.get(floor);
-			if (targetPosition == null) {
-				return false;
-			}
-			return movingOnRightDirection(direction, position, targetPosition);
-		}
-		
-		@Override
-		public Action getAction() {
-			return Action.WAIT;
-		}
-	}
-	
-	static class OnTopOfBlockedClone implements Strategy {
-
-		@Override
-		public boolean applies(int floor, int position) {
-			return BLOCKED_CLONES.contains(Arrays.asList(floor, position));
-		}
-
-		@Override
-		public Action getAction() {
-			return Action.WAIT;
-		}
-		
-	}
-	
-	static class BlockIfEverythingElseFails implements Strategy {
-
-		@Override
-		public boolean applies(int floor, int position) {
-			BLOCKED_CLONES.add(Arrays.asList(floor, position));
-			return true;
-		}
-
-		@Override
-		public Action getAction() {
-			return Action.BLOCK;
-		}
-		
-	}
-	
-	enum Action {
-		WAIT, BLOCK;
-	}
-	
-	enum Direction {
-		LEFT, RIGHT, NONE;
-	}
 }

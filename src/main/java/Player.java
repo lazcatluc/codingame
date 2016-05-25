@@ -16,13 +16,22 @@ class Player {
 	public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int n = in.nextInt();
-        for (int i = 0; i < n; i++) {
-            int v = in.nextInt();
+        int lastPeakValue = Integer.MIN_VALUE;
+        int biggestLoss = 0;
+        for (int i = 0; i < n; i++) {        	
+        	int stockValue = in.nextInt();
+        	if (stockValue > lastPeakValue) {
+        		lastPeakValue = stockValue;        		
+        	}
+        	int currentLoss = stockValue - lastPeakValue;
+        	if (currentLoss < biggestLoss) {
+        		biggestLoss = currentLoss;
+        	}
         }
 
         // Write an action using System.out.println()
         // To debug: System.err.println("Debug messages...");
 
-        System.out.println("answer");
+        System.out.println(biggestLoss);
     }
 }

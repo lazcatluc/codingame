@@ -34,8 +34,8 @@ class Player {
 		List<Integer> result = new ArrayList<>();
 		List<Integer> numbersToAdd = new ArrayList<>(currentLine);
 		Integer toAdd = 1;
-		if (currentLine.size() > 1 && currentLine.get(0).equals(currentLine.get(1))) {
-			toAdd = 2;
+		while (numbersToAdd.size() > 1 && numbersToAdd.get(0).equals(numbersToAdd.get(1))) {
+			toAdd++;
 			numbersToAdd.remove(0);
 		}
 		Integer currentlyRemoved = numbersToAdd.remove(0);

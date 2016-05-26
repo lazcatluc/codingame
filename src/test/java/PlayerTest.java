@@ -21,5 +21,10 @@ public class PlayerTest {
 	public void transformsTwoNumbersTwoTimesIntoEach1AndNumber() throws Exception {
 		assertThat(Player.transform(Arrays.asList(2, 1))).isEqualTo(Arrays.asList(1, 2, 1, 1));
 	}
+	
+	@Test
+	public void transformsNumberThreeTimesInto3AndNumber() throws Exception {
+		assertThat(Player.transform(Arrays.asList(1, 1, 1))).isEqualTo(Arrays.asList(3, 1));
+	}
 }
 

@@ -1,9 +1,8 @@
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -13,36 +12,39 @@ import java.util.Set;
  **/
 class Player {
 
-	static final Set<Node> GATEWAYS = new LinkedHashSet<>();
+	private static final Map<Integer, Node> NODES = new HashMap<>();
+	private static final Map<Node, Integer> MAX_CHAIN_LENGTH = new HashMap<>();
 	
-    public static void main(String args[]) {
+	public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        int numberOfNodes = in.nextInt(); 
-        int numberOfLinks = in.nextInt(); 
-        int numberOfGateways = in.nextInt(); 
-        for (int i = 0; i < numberOfLinks; i++) {
-            int firstNode = in.nextInt(); // N1 and N2 defines a link between these nodes
-            int secondNode = in.nextInt();
-            Node.get(firstNode).addLink(Node.get(secondNode));
+        int n = in.nextInt(); // the number of relationships of influence
+        for (int i = 0; i < n; i++) {
+            int x = in.nextInt(); // a relationship of influence between two people (x influences y)
+            int y = in.nextInt();
+            Node.get(y).addLink(Node.get(x));
         }
-        for (int i = 0; i < numberOfGateways; i++) {
-            markGateway(in.nextInt()); // the index of a gateway node
-        }
+        
+        // Write an action using System.out.println()
+        // To debug: System.err.println("Debug messages...");
 
-        // game loop
-        while (true) {
-            int skynetAgentIndex = in.nextInt(); // The index of the node on which the Skynet agent is positioned this turn
-            
-            List<Node> shortestPath = findShortestPathToGatewaysFrom(skynetAgentIndex);
-            
-            System.out.println(printLink(shortestPath.get(0), shortestPath.get(1)));
-        }
+
+        // The number of people involved in the longest succession of influences
+        System.out.println(NODES.values().stream().map(Player::parse).max((i1, i2) -> i1 - i2).orElse(0));
     }
+	
+	static int parse(Node node) {
+		if (MAX_CHAIN_LENGTH.containsKey(node)) {
+			return MAX_CHAIN_LENGTH.get(node);
+		}
+		node.getLinks().stream().filter(myNode -> !MAX_CHAIN_LENGTH.containsKey(myNode)).forEach(Player::parse);
+		Integer maxChain = node.getLinks().stream().map(MAX_CHAIN_LENGTH::get).max((i1, i2) -> i1 - i2).orElse(0) + 1;
+		MAX_CHAIN_LENGTH.put(node, maxChain);
+		return maxChain;
+	}
     
     static class Node {
     	private final int index;
     	private final Set<Node> linked = new LinkedHashSet<>();
-    	private static final Map<Integer, Node> NODES = new HashMap<>();
     	
     	private Node(int index) {
     		this.index = index;
@@ -50,7 +52,6 @@ class Player {
     	
     	public void addLink(Node node) {
     		linked.add(node);
-    		node.linked.add(this);
     	}
     	
     	public static Node get(int index) {
@@ -67,11 +68,6 @@ class Player {
 			return linked;
 		}
 
-		public void severLink(Node node) {
-			linked.remove(node);
-			node.linked.remove(this);
-		}
-
 		@Override
 		public String toString() {
 			return String.valueOf(index);
@@ -79,37 +75,4 @@ class Player {
 		
     }
 
-	public static void severLinkBetween(int i, int j) {
-		Node.get(i).severLink(Node.get(j));
-		Node.get(j).severLink(Node.get(i));
-	}
-
-	public static void markGateway(int index) {
-		GATEWAYS.add(Node.get(index));
-	}
-
-	public static Set<List<Node>> findPathsToGatewaysFrom(int startingPoint) {
-		return findPathsToGatewaysFrom(Node.get(startingPoint), Collections.emptyList());
-		
-	}
-	
-	private static Set<List<Node>> findPathsToGatewaysFrom(Node start, List<Node> previousNodes) {
-		List<Node> completeNodes = new ArrayList<>(previousNodes);
-		completeNodes.add(start);
-		if (GATEWAYS.contains(start)) {
-			return Collections.singleton(completeNodes);
-		}
-		Set<List<Node>> ret = new LinkedHashSet<>();
-		start.getLinks().stream().filter(node -> !previousNodes.contains(node))
-				.map(node -> findPathsToGatewaysFrom(node, completeNodes)).forEach(ret::addAll);
-		return ret;
-	}
-
-	public static List<Node> findShortestPathToGatewaysFrom(int startingPoint) {
-		return findPathsToGatewaysFrom(startingPoint).stream().min((path1, path2) -> path1.size() - path2.size()).get();
-	}
-
-	public static String printLink(Node start, Node finish) {
-		return start.toString() + " " + finish.toString();
-	}
 }

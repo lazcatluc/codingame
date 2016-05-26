@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.OptionalDouble;
 import java.util.Scanner;
 
 /**
@@ -24,7 +25,7 @@ class Player {
         // Write an action using System.out.println()
         // To debug: System.err.println("Debug messages...");
 
-        System.out.println("answer");
+        System.out.println(print(currentLine));
     }
 
 	static List<Integer> transform(List<Integer> currentLine) {
@@ -43,6 +44,13 @@ class Player {
 		result.add(currentlyRemoved);
 		result.addAll(transform(numbersToAdd));
 		return result;
+	}
+
+	public static String print(List<Integer> asList) {
+		StringBuilder sb = new StringBuilder();
+		asList.forEach(i -> sb.append(i).append(" "));
+		sb.deleteCharAt(sb.length() - 1);
+		return sb.toString();
 	}
 	
 }

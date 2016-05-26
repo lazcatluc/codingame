@@ -28,15 +28,20 @@ class Player {
     }
 
 	static List<Integer> transform(List<Integer> currentLine) {
+		if (currentLine.isEmpty()) {
+			return Collections.emptyList();
+		}
 		List<Integer> result = new ArrayList<>();
 		List<Integer> numbersToAdd = new ArrayList<>(currentLine);
-		int toAdd = 1;
+		Integer toAdd = 1;
 		if (currentLine.size() > 1 && currentLine.get(0).equals(currentLine.get(1))) {
 			toAdd = 2;
 			numbersToAdd.remove(0);
 		}
+		Integer currentlyRemoved = numbersToAdd.remove(0);
 		result.add(toAdd);
-		result.addAll(numbersToAdd);
+		result.add(currentlyRemoved);
+		result.addAll(transform(numbersToAdd));
 		return result;
 	}
 	

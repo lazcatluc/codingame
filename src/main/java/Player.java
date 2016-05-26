@@ -29,8 +29,14 @@ class Player {
 
 	static List<Integer> transform(List<Integer> currentLine) {
 		List<Integer> result = new ArrayList<>();
-		result.add(1);
-		result.addAll(currentLine);
+		List<Integer> numbersToAdd = new ArrayList<>(currentLine);
+		int toAdd = 1;
+		if (currentLine.size() > 1 && currentLine.get(0).equals(currentLine.get(1))) {
+			toAdd = 2;
+			numbersToAdd.remove(0);
+		}
+		result.add(toAdd);
+		result.addAll(numbersToAdd);
 		return result;
 	}
 	

@@ -12,33 +12,25 @@ class Player {
 	
 	public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        int giftBearers = in.nextInt();
-        int giftPrice = in.nextInt();
-        int[] budgets = new int[giftBearers];
-        for (int i = 0; i < giftBearers; i++) {
-            budgets[i] = in.nextInt();
+        int L = in.nextInt();
+        int H = in.nextInt();
+        for (int i = 0; i < H; i++) {
+            String numeral = in.next();
         }
-        int totalBudget = Arrays.stream(budgets).sum();
-        if (totalBudget < giftPrice) {
-        	System.out.println("IMPOSSIBLE");
-        	return;
+        int S1 = in.nextInt();
+        for (int i = 0; i < S1; i++) {
+            String num1Line = in.next();
         }
-        Arrays.sort(budgets);
-        
-        for (int i = 0; i < giftBearers; i++) {
-        	int contributors = giftBearers - i;
-        	int fairBudget = giftPrice / contributors;
-			if (budgets[i] > fairBudget) {
-        		System.out.println(fairBudget);
-        		giftPrice -= fairBudget;
-        		continue;
-        	}
-			System.out.println(budgets[i]);
-			giftPrice -= budgets[i];
+        int S2 = in.nextInt();
+        for (int i = 0; i < S2; i++) {
+            String num2Line = in.next();
         }
+        String operation = in.next();
+
         // Write an action using System.out.println()
         // To debug: System.err.println("Debug messages...");
 
+        System.out.println("result");
     }
 }
 

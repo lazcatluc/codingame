@@ -52,6 +52,7 @@ class Player {
 		private Location currentLocation;
 		private Direction currentDirection = Direction.SOUTH;
 		private Result result;
+		private int brokenObstacles;
 		
 		public BenderPath(List<String> rows) {
 			for (int i = 0; i < rows.size(); i++) {
@@ -69,7 +70,7 @@ class Player {
 			while (!result.isComplete()) {
 				Mover mover = new Mover();
 				mover.move();
-				result.add(new Trajectory(currentDirection, currentLocation, benderMode));
+				result.add(new Trajectory(currentDirection, currentLocation, benderMode, brokenObstacles));
 				currentLocation = mover.getNewLocation();
 				currentDirection = mover.getNewDirection();
 			}
@@ -120,6 +121,7 @@ class Player {
 					return Direction.IMPASSABLE;
 				}
 				futurama.remove(getLocation());
+				brokenObstacles++;
 				return in;
 			}
 			
@@ -238,11 +240,13 @@ class Player {
 		private final Direction direction;
 		private final Location location;
 		private final BenderMode benderMode;
+		private final int brokenObstacles;
 		
-		public Trajectory(Direction direction, Location location, BenderMode benderMode) {
+		public Trajectory(Direction direction, Location location, BenderMode benderMode, int brokenObstacles) {
 			this.direction = direction;
 			this.location = location;
 			this.benderMode = benderMode;
+			this.brokenObstacles = brokenObstacles;
 		}
 
 		public Location getLocation() {
@@ -258,6 +262,7 @@ class Player {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + ((benderMode == null) ? 0 : benderMode.hashCode());
+			result = prime * result + brokenObstacles;
 			result = prime * result + ((direction == null) ? 0 : direction.hashCode());
 			result = prime * result + ((location == null) ? 0 : location.hashCode());
 			return result;
@@ -274,6 +279,8 @@ class Player {
 			Trajectory other = (Trajectory) obj;
 			if (benderMode != other.benderMode)
 				return false;
+			if (brokenObstacles != other.brokenObstacles)
+				return false;
 			if (direction != other.direction)
 				return false;
 			if (location == null) {
@@ -282,11 +289,6 @@ class Player {
 			} else if (!location.equals(other.location))
 				return false;
 			return true;
-		}
-
-		@Override
-		public String toString() {
-			return "Trajectory [direction=" + direction + ", location=" + location + ", benderMode=" + benderMode + "]";
 		}
 		
 	}

@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -145,7 +146,7 @@ class Player {
 		
 		@Override
 		public boolean applies(int floor, int position) {
-			List<Integer> targetPosition = ELEVATORS.get(floor);
+			List<Integer> targetPosition = ELEVATORS.getOrDefault(floor, Collections.emptyList());
 			for (Integer elevator : targetPosition) {
 				if (movingOnRightDirection(direction, position, elevator)) {
 					return true;

@@ -146,13 +146,13 @@ class Player {
 		
 		@Override
 		public boolean applies(int floor, int position) {
-			List<Integer> targetPosition = ELEVATORS.getOrDefault(floor, Collections.emptyList());
-			for (Integer elevator : targetPosition) {
-				if (movingOnRightDirection(direction, position, elevator)) {
-					return true;
-				}
+			List<Integer> targetPosition = new ArrayList<>(ELEVATORS.getOrDefault(floor, Collections.emptyList()));
+			if (targetPosition.isEmpty()) {
+				return false;
 			}
-			return false;
+			Collections.sort(targetPosition, (i1, i2) -> Math.abs(i1 - position) - Math.abs(i2 - position));
+			
+			return movingOnRightDirection(direction, position, targetPosition.get(0));
 		}
 		
 		@Override

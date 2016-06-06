@@ -16,6 +16,7 @@ class Player {
 	
 	private static final Map<Integer, List<Integer>> ELEVATORS = new HashMap<>();
 	private static final Set<List<Integer>> BLOCKED_CLONES = new HashSet<>();
+	private static int nbAdditionalElevators;
 
 	public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
@@ -25,7 +26,7 @@ class Player {
         int exitFloor = in.nextInt(); // floor on which the exit is found
         int exitPos = in.nextInt(); // position of the exit on its floor
         int nbTotalClones = in.nextInt(); // number of generated clones
-        int nbAdditionalElevators = in.nextInt(); // ignore (always zero)
+        nbAdditionalElevators = in.nextInt(); // ignore (always zero)
         int nbElevators = in.nextInt(); // number of elevators
         for (int i = 0; i < nbElevators; i++) {
             int elevatorFloor = in.nextInt(); // floor on which this elevator is found
@@ -43,6 +44,7 @@ class Player {
             		new OnTopOfBlockedClone(),
             		new MovesTowardsExit(exitFloor, exitPos, direction),
             		new BecomeElevatorIfNoneIsFound(exitFloor),
+            		new AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(width, exitFloor),
             		new MovesTowardsElevator(direction),
             		new BlockIfEverythingElseFails()
         		);
@@ -75,6 +77,41 @@ class Player {
 		Action getAction();
 	}
 	
+	static class AddElevatorIfElevatorIsTooFarAndWeCanAffordIt extends ClosestElevator {
+
+		private final int width;
+		private final int exitFloor;
+
+		public AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(int width, int exitFloor) {
+			this.width = width;
+			this.exitFloor = exitFloor;
+		}
+
+		@Override
+		public Action getAction() {
+			return Action.ELEVATOR;
+		}
+
+		@Override
+		protected boolean appliesClosestElevator(int floor, int position, int closestElevator) {
+			boolean elevatorTooFar = Math.abs(position - closestElevator) > width / 2;
+			int floorsAboveNeedingElevators = 0;
+			for (int upperFloor = floor + 1; upperFloor < exitFloor; upperFloor++) {
+				if (!ELEVATORS.containsKey(upperFloor)) {
+					floorsAboveNeedingElevators++;
+				}
+			}
+			boolean weCanAffordIt = nbAdditionalElevators > floorsAboveNeedingElevators;
+			if (elevatorTooFar && weCanAffordIt) {
+				addElevator(floor, position);
+				nbAdditionalElevators--;
+				return true;
+			}
+			return false;
+		}
+		
+	}
+	
 	static class BecomeElevatorIfNoneIsFound implements Strategy {
 
 		private final int exitFloor;
@@ -88,6 +125,7 @@ class Player {
 			boolean floorLacksElevator = floor != exitFloor && !ELEVATORS.containsKey(floor);
 			if (floorLacksElevator) {
 				addElevator(floor, position);
+				nbAdditionalElevators--;
 			}
 			return floorLacksElevator;
 		}
@@ -135,8 +173,23 @@ class Player {
 		}
 		
 	}
+	
+	static abstract class ClosestElevator implements Strategy {
+		@Override
+		public final boolean applies(int floor, int position) {
+			List<Integer> targetPosition = new ArrayList<>(ELEVATORS.getOrDefault(floor, Collections.emptyList()));
+			if (targetPosition.isEmpty()) {
+				return false;
+			}
+			Collections.sort(targetPosition, (i1, i2) -> Math.abs(i1 - position) - Math.abs(i2 - position));
+			
+			return appliesClosestElevator(floor, position, targetPosition.get(0));
+		}
 
-	static class MovesTowardsElevator implements Strategy {
+		protected abstract boolean appliesClosestElevator(int floor, int position, int closestElevator);
+	}
+
+	static class MovesTowardsElevator extends ClosestElevator {
 		
 		private final Direction direction;
 		
@@ -145,14 +198,8 @@ class Player {
 		}
 		
 		@Override
-		public boolean applies(int floor, int position) {
-			List<Integer> targetPosition = new ArrayList<>(ELEVATORS.getOrDefault(floor, Collections.emptyList()));
-			if (targetPosition.isEmpty()) {
-				return false;
-			}
-			Collections.sort(targetPosition, (i1, i2) -> Math.abs(i1 - position) - Math.abs(i2 - position));
-			
-			return movingOnRightDirection(direction, position, targetPosition.get(0));
+		public boolean appliesClosestElevator(int floor, int position, int closestElevator) {
+			return movingOnRightDirection(direction, position, closestElevator);
 		}
 		
 		@Override

@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,7 +13,7 @@ import java.util.Set;
  **/
 class Player {
 	
-	private static final Map<Integer, Integer> ELEVATORS = new HashMap<>();
+	private static final Map<Integer, List<Integer>> ELEVATORS = new HashMap<>();
 	private static final Set<List<Integer>> BLOCKED_CLONES = new HashSet<>();
 
 	public static void main(String args[]) {
@@ -28,7 +29,7 @@ class Player {
         for (int i = 0; i < nbElevators; i++) {
             int elevatorFloor = in.nextInt(); // floor on which this elevator is found
             int elevatorPos = in.nextInt(); // position of the elevator on its floor
-            ELEVATORS.put(elevatorFloor, elevatorPos);
+            addElevator(elevatorFloor, elevatorPos);
         }
 
         // game loop
@@ -40,6 +41,7 @@ class Player {
             		new NoActiveClone(),
             		new OnTopOfBlockedClone(),
             		new MovesTowardsExit(exitFloor, exitPos, direction),
+            		new BecomeElevatorIfNoneIsFound(exitFloor),
             		new MovesTowardsElevator(direction),
             		new BlockIfEverythingElseFails()
         		);
@@ -51,6 +53,15 @@ class Player {
         }
     }
 	
+	public static void addElevator(int elevatorFloor, int elevatorPosition) {
+		List<Integer> elevators = ELEVATORS.get(elevatorFloor);
+		if (elevators == null) {
+			elevators = new ArrayList<>();
+			ELEVATORS.put(elevatorFloor, elevators);
+		}
+		elevators.add(elevatorPosition);
+	}
+	
 	static boolean movingOnRightDirection(Direction direction, int clonePosition, int targetPosition) {
 		int distance = clonePosition - targetPosition;
 		return distance == 0 ||
@@ -61,6 +72,30 @@ class Player {
 	interface Strategy {
 		boolean applies(int floor, int position);
 		Action getAction();
+	}
+	
+	static class BecomeElevatorIfNoneIsFound implements Strategy {
+
+		private final int exitFloor;
+
+		public BecomeElevatorIfNoneIsFound(int exitFloor) {
+			this.exitFloor = exitFloor;
+		}
+
+		@Override
+		public boolean applies(int floor, int position) {
+			boolean floorLacksElevator = floor != exitFloor && !ELEVATORS.containsKey(floor);
+			if (floorLacksElevator) {
+				addElevator(floor, position);
+			}
+			return floorLacksElevator;
+		}
+
+		@Override
+		public Action getAction() {
+			return Action.ELEVATOR;
+		}
+		
 	}
 	
 	static class MovesTowardsExit implements Strategy {
@@ -110,11 +145,13 @@ class Player {
 		
 		@Override
 		public boolean applies(int floor, int position) {
-			Integer targetPosition = ELEVATORS.get(floor);
-			if (targetPosition == null) {
-				return false;
+			List<Integer> targetPosition = ELEVATORS.get(floor);
+			for (Integer elevator : targetPosition) {
+				if (movingOnRightDirection(direction, position, elevator)) {
+					return true;
+				}
 			}
-			return movingOnRightDirection(direction, position, targetPosition);
+			return false;
 		}
 		
 		@Override
@@ -153,7 +190,7 @@ class Player {
 	}
 	
 	enum Action {
-		WAIT, BLOCK;
+		WAIT, BLOCK, ELEVATOR;
 	}
 	
 	enum Direction {

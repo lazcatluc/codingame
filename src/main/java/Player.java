@@ -31,8 +31,9 @@ class Player {
         for (int i = 0; i < nbElevators; i++) {
             int elevatorFloor = in.nextInt(); // floor on which this elevator is found
             int elevatorPos = in.nextInt(); // position of the elevator on its floor
-            addElevator(elevatorFloor, elevatorPos);
+            addElevator(elevatorFloor, elevatorPos, ELEVATORS);
         }
+        boolean[][] reachable = generateReachable(nbFloors, width, exitFloor, exitPos, ELEVATORS);
 
         // game loop
         while (true) {
@@ -44,6 +45,7 @@ class Player {
             		new OnTopOfBlockedClone(),
             		new MovesTowardsExit(exitFloor, exitPos, direction),
             		new BecomeElevatorIfNoneIsFound(exitFloor),
+            		new AddElevatorIfOnExitPositionAndWeCanAffordIt(exitFloor, exitPos),
             		new AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(width, exitFloor),
             		new MovesTowardsElevator(direction),
             		new BlockIfEverythingElseFails()
@@ -55,12 +57,59 @@ class Player {
             		.findFirst().get().getAction()); // action: WAIT or BLOCK
         }
     }
+
+	protected static boolean[][] generateReachable(int nbFloors, int width, int exitFloor, int exitPos, 
+			Map<Integer, List<Integer>> allElevators) {
+		boolean[][] reachable = new boolean[nbFloors + 1][width];
+        reachable[exitFloor][exitPos] = true;
+        for (int floor = exitFloor; floor >= 0; floor--) {
+        	List<Integer> elevators = allElevators.getOrDefault(floor, Collections.emptyList());
+        	fillBasedOnElevators(reachable, floor, elevators);
+        }
+        return reachable;
+	}
+
+	protected static void fillBasedOnElevators(boolean[][] reachable, int floor, List<Integer> elevators) {
+		int width = reachable[0].length;
+		int i = findFirstReachablePoint(reachable, floor);
+		i = findFirstNonReachableElevatorToTheLeft(reachable, floor, elevators, i);
+		i++;
+		i = fillUntilTheFirstNonReachableElevatorToTheRight(reachable, floor, elevators, width, i);
+	}
+
+	protected static int fillUntilTheFirstNonReachableElevatorToTheRight(boolean[][] reachable, int floor,
+			List<Integer> elevators, int width, int i) {
+		while((!elevators.contains(i) || reachable[floor][i]) && i < width) {
+			reachable[floor][i] = true;
+			if(floor > 0) {
+				reachable[floor-1][i] = true;
+			}
+			i++;
+		}
+		return i;
+	}
+
+	protected static int findFirstNonReachableElevatorToTheLeft(boolean[][] reachable, int floor, List<Integer> elevators, int i) {
+		while((!elevators.contains(i) || reachable[floor][i]) && i > 0) {
+			reachable[floor][i] = true;
+			i--;		
+		}
+		return i;
+	}
+
+	protected static int findFirstReachablePoint(boolean[][] reachable, int floor) {
+		int i = 0;
+		while (!reachable[floor][i]) {
+			i++;
+		}
+		return i;
+	}
 	
-	public static void addElevator(int elevatorFloor, int elevatorPosition) {
-		List<Integer> elevators = ELEVATORS.get(elevatorFloor);
+	public static void addElevator(int elevatorFloor, int elevatorPosition, Map<Integer, List<Integer>> allElevators) {
+		List<Integer> elevators = allElevators.get(elevatorFloor);
 		if (elevators == null) {
 			elevators = new ArrayList<>();
-			ELEVATORS.put(elevatorFloor, elevators);
+			allElevators.put(elevatorFloor, elevators);
 		}
 		elevators.add(elevatorPosition);
 	}
@@ -75,6 +124,33 @@ class Player {
 	interface Strategy {
 		boolean applies(int floor, int position);
 		Action getAction();
+	}
+	
+	static class AddElevatorIfOnExitPositionAndWeCanAffordIt extends ClosestElevator {
+
+		private final int exitPosition;
+		private final int exitFloor;
+
+		public AddElevatorIfOnExitPositionAndWeCanAffordIt(int exitFloor, int exitPosition) {
+			this.exitFloor = exitFloor;
+			this.exitPosition = exitPosition;
+		}
+
+		@Override
+		public Action getAction() {
+			return Action.ELEVATOR;
+		}
+
+		@Override
+		protected boolean appliesClosestElevator(int floor, int position, int closestElevator) {
+			boolean weCanAffordIt = nbAdditionalElevators >= exitFloor - floor;
+			if (position == exitPosition && weCanAffordIt) {
+				nbAdditionalElevators--;
+				return true;
+			}
+			return false;
+		}
+		
 	}
 	
 	static class AddElevatorIfElevatorIsTooFarAndWeCanAffordIt extends ClosestElevator {
@@ -102,8 +178,8 @@ class Player {
 				}
 			}
 			boolean weCanAffordIt = nbAdditionalElevators > floorsAboveNeedingElevators;
-			if (elevatorTooFar && weCanAffordIt) {
-				addElevator(floor, position);
+			if (elevatorTooFar && weCanAffordIt && floor != exitFloor) {
+				addElevator(floor, position, ELEVATORS);
 				nbAdditionalElevators--;
 				return true;
 			}
@@ -124,7 +200,7 @@ class Player {
 		public boolean applies(int floor, int position) {
 			boolean floorLacksElevator = floor != exitFloor && !ELEVATORS.containsKey(floor);
 			if (floorLacksElevator) {
-				addElevator(floor, position);
+				addElevator(floor, position, ELEVATORS);
 				nbAdditionalElevators--;
 			}
 			return floorLacksElevator;

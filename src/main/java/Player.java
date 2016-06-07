@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -44,10 +45,12 @@ class Player {
             		new NoActiveClone(),
             		new OnTopOfBlockedClone(),
             		new MovesTowardsExit(exitFloor, exitPos, direction),
-            		new BecomeElevatorIfNoneIsFound(exitFloor),
-            		new AddElevatorIfOnExitPositionAndWeCanAffordIt(exitFloor, exitPos),
-            		new AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(width, exitFloor),
-            		new MovesTowardsElevator(direction),
+            		new BecomeElevatorIfNoneIsFound(exitFloor, reachable),
+            		new AddElevatorIfOnExitPositionAndWeCanAffordIt(exitFloor, exitPos, reachable),
+            		new AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(width, exitFloor, reachable),
+            		new AddElevatorIfWeCanChainThreeAndWeCanAffordIt(exitFloor, reachable),
+            		new MovesTowardsElevator(direction, reachable),
+            		new MovesTowardsAnAreaWhichHasReachableUpstairs(direction, reachable),
             		new BlockIfEverythingElseFails()
         		);
             // Write an action using System.out.println()
@@ -57,6 +60,23 @@ class Player {
             		.findFirst().get().getAction()); // action: WAIT or BLOCK
         }
     }
+	
+	protected static boolean isElevator(int floor, int position) {
+		return ELEVATORS.getOrDefault(floor, Collections.emptyList()).contains(position);
+	}
+
+	
+	protected static int extraElevatorsWeCanAfford(int floor, int exitFloor, boolean[][] reachable) {
+		int floorsAboveNeedingElevators = 0;
+		for (int upperFloor = floor + 1; upperFloor < exitFloor; upperFloor++) {
+			if (ELEVATORS.getOrDefault(upperFloor, Collections.emptyList()).stream().
+					noneMatch(elevatorPosition -> reachable[floor][elevatorPosition])) {
+				floorsAboveNeedingElevators++;
+			}
+		}
+		int extraElevatorsWeCanAfford = nbAdditionalElevators - floorsAboveNeedingElevators;
+		return extraElevatorsWeCanAfford;
+	}
 
 	protected static boolean[][] generateReachable(int nbFloors, int width, int exitFloor, int exitPos, 
 			Map<Integer, List<Integer>> allElevators) {
@@ -126,12 +146,76 @@ class Player {
 		Action getAction();
 	}
 	
-	static class AddElevatorIfOnExitPositionAndWeCanAffordIt extends ClosestElevator {
+	static class MovesTowardsAnAreaWhichHasReachableUpstairs implements Strategy {
+
+		private final Direction direction;
+		private final boolean[][] reachable;
+
+		public MovesTowardsAnAreaWhichHasReachableUpstairs(Direction direction, boolean[][] reachable) {
+			this.direction = direction;
+			this.reachable = reachable;
+		}
+
+		@Override
+		public boolean applies(int floor, int position) {
+			if (floor == reachable.length) {
+				return false;
+			}
+			boolean[] upstairs = reachable[floor + 1];
+			if (upstairs[position]) {
+				return false;
+			}
+			if (direction == Direction.RIGHT) {
+				return searchRight(floor, position, upstairs);
+			}
+			if (direction == Direction.LEFT) {
+				return searchLeft(floor, position, upstairs);
+			}
+			return false;
+		}
+
+		protected boolean searchLeft(int floor, int position, boolean[] upstairs) {
+			for (int i = position; i >= 0; i--) {
+				if (upstairs[i]) {
+					return true;
+				}
+				if (isElevator(floor, i)) {
+					return false;
+				}
+			}
+			return false;
+		}
+
+		protected boolean searchRight(int floor, int position, boolean[] upstairs) {
+			for (int i = position; i < upstairs.length; i++) {
+				if (upstairs[i]) {
+					return true;
+				}
+				if (isElevator(floor, i)) {
+					return false;
+				}
+			}
+			return false;
+		}
+
+		protected boolean isElevator(int floor, int i) {
+			return ELEVATORS.getOrDefault(floor, Collections.emptyList()).contains(i);
+		}
+
+		@Override
+		public Action getAction() {
+			return Action.WAIT;
+		}
+		
+	}
+	
+	static class AddElevatorIfOnExitPositionAndWeCanAffordIt extends ClosestReachableElevator {
 
 		private final int exitPosition;
 		private final int exitFloor;
 
-		public AddElevatorIfOnExitPositionAndWeCanAffordIt(int exitFloor, int exitPosition) {
+		public AddElevatorIfOnExitPositionAndWeCanAffordIt(int exitFloor, int exitPosition, boolean[][] reachable) {
+			super(reachable);
 			this.exitFloor = exitFloor;
 			this.exitPosition = exitPosition;
 		}
@@ -143,6 +227,9 @@ class Player {
 
 		@Override
 		protected boolean appliesClosestElevator(int floor, int position, int closestElevator) {
+			if (isElevator(floor, position)) {
+				return false;
+			}
 			boolean weCanAffordIt = nbAdditionalElevators >= exitFloor - floor;
 			if (position == exitPosition && weCanAffordIt) {
 				nbAdditionalElevators--;
@@ -153,14 +240,17 @@ class Player {
 		
 	}
 	
-	static class AddElevatorIfElevatorIsTooFarAndWeCanAffordIt extends ClosestElevator {
+	static class AddElevatorIfElevatorIsTooFarAndWeCanAffordIt extends ClosestReachableElevator {
 
 		private final int width;
 		private final int exitFloor;
+		private final boolean[][] reachable;
 
-		public AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(int width, int exitFloor) {
+		public AddElevatorIfElevatorIsTooFarAndWeCanAffordIt(int width, int exitFloor, boolean[][] reachable) {
+			super(reachable);
 			this.width = width;
 			this.exitFloor = exitFloor;
+			this.reachable = reachable;
 		}
 
 		@Override
@@ -170,40 +260,84 @@ class Player {
 
 		@Override
 		protected boolean appliesClosestElevator(int floor, int position, int closestElevator) {
-			boolean elevatorTooFar = Math.abs(position - closestElevator) > width / 2;
-			int floorsAboveNeedingElevators = 0;
-			for (int upperFloor = floor + 1; upperFloor < exitFloor; upperFloor++) {
-				if (!ELEVATORS.containsKey(upperFloor)) {
-					floorsAboveNeedingElevators++;
-				}
+			if (isElevator(floor, position)) {
+				return false;
 			}
-			boolean weCanAffordIt = nbAdditionalElevators > floorsAboveNeedingElevators;
-			if (elevatorTooFar && weCanAffordIt && floor != exitFloor) {
+			int extraElevatorsWeCanAfford = extraElevatorsWeCanAfford(floor, exitFloor, reachable);
+			boolean elevatorTooFar = Math.abs(position - closestElevator) > width / (extraElevatorsWeCanAfford + 1);
+			boolean upstairsIsReachable = floor < exitFloor && reachable(floor + 1, position);
+			if (elevatorTooFar && extraElevatorsWeCanAfford > 0 && upstairsIsReachable) {
 				addElevator(floor, position, ELEVATORS);
 				nbAdditionalElevators--;
 				return true;
 			}
 			return false;
 		}
+
+		
+	}
+	
+	static class AddElevatorIfWeCanChainThreeAndWeCanAffordIt implements Strategy {
+
+		private final int exitFloor;
+		private final boolean[][] reachable;
+
+		public AddElevatorIfWeCanChainThreeAndWeCanAffordIt(int exitFloor, boolean[][] reachable) {
+			this.exitFloor = exitFloor;
+			this.reachable = reachable;
+		}
+
+		@Override
+		public Action getAction() {
+			return Action.ELEVATOR;
+		}
+
+		@Override
+		public boolean applies(int floor, int position) {
+			if (isElevator(floor, position)) {
+				return false;
+			}
+			int extraElevatorsWeCanAfford = extraElevatorsWeCanAfford(floor, exitFloor, reachable);
+			boolean applies = extraElevatorsWeCanAfford > 0 && floor < exitFloor && floor > 0 && reachable[floor + 1][position] && 
+					isElevator(floor + 1, position) && isElevator(floor - 1, position) && !isElevator(floor, position);
+			if (applies) {
+				addElevator(floor, position, ELEVATORS);
+			}
+			return applies;
+		}
+
+		
 		
 	}
 	
 	static class BecomeElevatorIfNoneIsFound implements Strategy {
 
 		private final int exitFloor;
+		private final boolean[][] reachable;
 
-		public BecomeElevatorIfNoneIsFound(int exitFloor) {
+		public BecomeElevatorIfNoneIsFound(int exitFloor, boolean[][] reachable) {
 			this.exitFloor = exitFloor;
+			this.reachable = reachable;
 		}
 
 		@Override
 		public boolean applies(int floor, int position) {
-			boolean floorLacksElevator = floor != exitFloor && !ELEVATORS.containsKey(floor);
-			if (floorLacksElevator) {
+			if (isElevator(floor, position)) {
+				return false;
+			}
+			boolean floorLacksElevator = floorLacksReachableElevator(floor);
+			boolean addingElevator = floorLacksElevator && reachable[floor + 1][position];
+			if (addingElevator) {
 				addElevator(floor, position, ELEVATORS);
 				nbAdditionalElevators--;
 			}
-			return floorLacksElevator;
+			return addingElevator;
+		}
+
+		protected boolean floorLacksReachableElevator(int floor) {
+			List<Integer> elevators = ELEVATORS.getOrDefault(floor, Collections.emptyList());
+			
+			return floor < exitFloor && elevators.stream().noneMatch(elevatorPosition -> reachable[floor][elevatorPosition]);
 		}
 
 		@Override
@@ -250,26 +384,41 @@ class Player {
 		
 	}
 	
-	static abstract class ClosestElevator implements Strategy {
+	static abstract class ClosestReachableElevator implements Strategy {
+		
+		private final boolean[][] reachable;
+		
+		public ClosestReachableElevator(boolean[][] reachable) {
+			this.reachable = reachable;
+		}
+		
+		protected boolean reachable(int floor, int elevatorPosition) {
+			return reachable[floor][elevatorPosition];
+		}
+
 		@Override
 		public final boolean applies(int floor, int position) {
 			List<Integer> targetPosition = new ArrayList<>(ELEVATORS.getOrDefault(floor, Collections.emptyList()));
-			if (targetPosition.isEmpty()) {
+			List<Integer> reachableTargetPosition = targetPosition.stream()
+					.filter(elevatorPosition -> reachable(floor, elevatorPosition)).collect(Collectors.toList());
+			Collections.sort(reachableTargetPosition, (i1, i2) -> Math.abs(i1 - position) - Math.abs(i2 - position));
+			
+			if (reachableTargetPosition.isEmpty()) {
 				return false;
 			}
-			Collections.sort(targetPosition, (i1, i2) -> Math.abs(i1 - position) - Math.abs(i2 - position));
 			
-			return appliesClosestElevator(floor, position, targetPosition.get(0));
+			return appliesClosestElevator(floor, position, reachableTargetPosition.get(0));
 		}
 
 		protected abstract boolean appliesClosestElevator(int floor, int position, int closestElevator);
 	}
 
-	static class MovesTowardsElevator extends ClosestElevator {
+	static class MovesTowardsElevator extends ClosestReachableElevator {
 		
 		private final Direction direction;
 		
-		public MovesTowardsElevator(Direction direction) {
+		public MovesTowardsElevator(Direction direction, boolean[][] reachable) {
+			super(reachable);
 			this.direction = direction;
 		}
 		

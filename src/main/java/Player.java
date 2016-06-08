@@ -34,7 +34,8 @@ class Player {
             int elevatorPos = in.nextInt(); // position of the elevator on its floor
             addElevator(elevatorFloor, elevatorPos, ELEVATORS);
         }
-        int[][] reachable = new Reachable(nbFloors, width, exitFloor, exitPos, ELEVATORS).getReachable();
+        int[][] reachable = new Reachable(nbFloors, width, exitFloor, exitPos, ELEVATORS, 
+        		Collections.emptyMap(), nbAdditionalElevators, nbRounds, 6).getReachable();
 
         // game loop
         while (true) {
@@ -77,36 +78,81 @@ class Player {
 		int extraElevatorsWeCanAfford = nbAdditionalElevators - floorsAboveNeedingElevators;
 		return extraElevatorsWeCanAfford;
 	}
-
+	
 	static class Reachable {
 		private final int[][] reachable;
 		private final Map<Integer, List<Integer>> addedElevators;
 		private final int exitFloor;
+		private final int exitPosition;
 		private final Map<Integer, List<Integer>> initialElevators;
+		private final int numberOfAdditionalElevators;
+		private final int numberOfTurns;
+		private final int startingPosition;
+		
+		private Reachable(Reachable original) {
+			this.exitFloor = original.exitFloor;
+			this.exitPosition = original.exitPosition;
+			this.initialElevators = original.initialElevators;
+			this.addedElevators = new HashMap<>(original.addedElevators);
+			reachable = new int[original.reachable.length][original.reachable[0].length];
+			this.numberOfAdditionalElevators = original.numberOfAdditionalElevators;
+			this.numberOfTurns = original.numberOfTurns;
+			this.startingPosition = original.startingPosition;
+		}
 		
 		public Reachable(int numberOfFloors, int width, int exitFloor, int exitPosition,
-				Map<Integer, List<Integer>> initialElevators) {
+				Map<Integer, List<Integer>> initialElevators, Map<Integer, List<Integer>> addedElevators, 
+				int numberOfAdditionalElevators, int numberOfTurns, int startingPosition) {
 			this.exitFloor = exitFloor;
+			this.exitPosition = exitPosition;
 			this.initialElevators = initialElevators;
-			addedElevators = new HashMap<>();
+			this.addedElevators = new HashMap<>(addedElevators);
 			reachable = new int[numberOfFloors + 1][width];
+			this.numberOfAdditionalElevators = numberOfAdditionalElevators;
+			this.numberOfTurns = numberOfTurns;
+			this.startingPosition = startingPosition;
+		}
+		
+		public boolean generateReachable() {
+			for (int i = 0; i < reachable.length; i++) {
+				for (int j = 0; j < reachable[0].length; j++) {
+					reachable[i][j] = 0;
+				}
+			}
 			reachable[exitFloor][exitPosition] = 1;
-			generateReachable();
-		}
-		
-		private void generateReachable() {
+			for (int floor = exitFloor - 1; floor >=0; floor--) {
+				if (isElevator(floor, exitPosition)) {
+					reachable[floor][exitPosition] = exitFloor - floor + getElevatorMovingCost(floor, exitPosition); 
+					if (exitPosition > 0 && !isElevator(floor, exitPosition - 1)) {
+						reachable[floor][exitPosition - 1] = reachable[floor][exitPosition] + 1;
+					}
+					if (exitPosition < reachable[exitFloor].length && !isElevator(floor, exitPosition + 1)) {
+						reachable[floor][exitPosition + 1] = reachable[floor][exitPosition] + 1;
+					}
+					continue;
+				}
+				break;
+			}
 			for (int floor = exitFloor; floor >= 0; floor--) {
-	        	List<Integer> elevators = initialElevators.getOrDefault(floor, Collections.emptyList());
-	        	List<Integer> elevatorsOnLowerFloor = initialElevators.getOrDefault(floor - 1, Collections.emptyList());
-	        	fillBasedOnElevators(floor, elevators, elevatorsOnLowerFloor);
+	        	List<Integer> elevators = new ArrayList<>(initialElevators.getOrDefault(floor, Collections.emptyList()));
+	        	elevators.addAll(addedElevators.getOrDefault(floor, Collections.emptyList()));
+	        	List<Integer> elevatorsOnLowerFloor = new ArrayList<>(initialElevators.getOrDefault(floor - 1, Collections.emptyList()));
+	        	elevatorsOnLowerFloor.addAll(addedElevators.getOrDefault(floor - 1, Collections.emptyList()));
+	        	if (!fillBasedOnElevators(floor, elevators, elevatorsOnLowerFloor)) {
+	        		return false;
+	        	}
 	        }
+			return true;
 		}
 		
-		private void fillBasedOnElevators(int floor, List<Integer> elevators, List<Integer> elevatorsOnLowerFloor) {
+		private boolean fillBasedOnElevators(int floor, List<Integer> elevators, List<Integer> elevatorsOnLowerFloor) {
 			int width = reachable[0].length;
 			int i = findFirstReachablePoint(floor);
 			if (i == width) {
-				i = findFastestReachable(reachable[floor + 1]);
+				if (addedElevators.containsKey(floor)) {
+					return false;
+				}
+				i = findFastestReachable(floor);
 				addElevator(floor, i, addedElevators);
 				reachable[floor][i] = reachable[floor + 1][i] + 3;
 			}
@@ -117,18 +163,30 @@ class Player {
 					i = findFirstNonReachableElevatorToTheLeft(floor, elevators, elevatorsOnLowerFloor, width, i);
 				}
 			}
+			return true;
 		}
 		
-		private int findFastestReachable(int[] reachable) {
+		private int findFastestReachable(int floor) {
 			int position = -1;
 			int min = Integer.MAX_VALUE;
-			for (int i = 0; i < reachable.length; i++) {
-				if (reachable[i] > 0 && reachable[i] < min) {
-					min = reachable[i];
-					position = i;
+			for (int i = 0; i < reachable[floor].length; i++) {
+				if (isElevator(floor, i)) {
+					continue;
 				}
+				addElevator(floor, i, addedElevators);
+				Reachable child = new Reachable(this);
+				if (child.generateReachable() && child.reachable[0][startingPosition] < min && 
+						child.reachable[0][startingPosition] > 0) {
+					position = i;
+					min = child.reachable[0][startingPosition];
+				}
+				removeElevator(floor, i, addedElevators);
 			}
 			return position;
+		}
+		
+		protected int getElevatorMovingCost(int floor, int position) {
+			return addedElevators.getOrDefault(floor, Collections.emptyList()).contains(position)?3:1;
 		}
 		
 		protected int fillUntilTheFirstNonReachableElevatorToTheRight(int floor,
@@ -138,12 +196,13 @@ class Player {
 					reachable[floor][i] = reachable[floor][i - 1] + 1;
 				}
 				if(floor > 0 && elevatorsOnLowerFloor.contains(i) && reachable[floor-1][i] == 0) {
-					reachable[floor-1][i] = reachable[floor][i] + 1;
+					int elevatorMovingCost = getElevatorMovingCost(floor - 1, i);
+					reachable[floor-1][i] = reachable[floor][i] + elevatorMovingCost;
 					if (i < width - 1 && !elevatorsOnLowerFloor.contains(i + 1)) {
-						reachable[floor-1][i + 1] = reachable[floor][i] + 2;
+						reachable[floor-1][i + 1] = reachable[floor][i] + elevatorMovingCost + 1;
 					}
 					if (i > 0 && !elevatorsOnLowerFloor.contains(i - 1)) {
-						reachable[floor-1][i - 1] = reachable[floor][i] + 4;
+						reachable[floor-1][i - 1] = reachable[floor][i] + elevatorMovingCost + 3;
 					}
 				}
 				i++;
@@ -153,15 +212,16 @@ class Player {
 		
 		protected int findFirstNonReachableElevatorToTheLeft(int floor, List<Integer> elevators,
 				List<Integer> elevatorsOnLowerFloor, int width, int i) {
-			while(!elevators.contains(i) && (reachable[floor][i] == 0 || reachable[floor][i] > reachable[floor][i + 1] + 1) && i > 0) {
+			while(!elevators.contains(i) && i > 0 && (reachable[floor][i] == 0 || reachable[floor][i] > reachable[floor][i + 1] + 1)) {
 				reachable[floor][i] = reachable[floor][i + 1] + 1;	
 				if(floor > 0 && elevatorsOnLowerFloor.contains(i)) {
-					reachable[floor-1][i] = reachable[floor][i] + 1;
+					int elevatorMovingCost = getElevatorMovingCost(floor - 1, i);
+					reachable[floor-1][i] = reachable[floor][i] + elevatorMovingCost;
 					if (i < width - 1 && !elevatorsOnLowerFloor.contains(i + 1)) {
-						reachable[floor - 1][i + 1] = reachable[floor][i] + 4;
+						reachable[floor - 1][i + 1] = reachable[floor][i] + elevatorMovingCost + 3;
 					}
 					if (i > 0 && !elevatorsOnLowerFloor.contains(i - 1)) {
-						reachable[floor - 1][i - 1] = reachable[floor][i] + 2;
+						reachable[floor - 1][i - 1] = reachable[floor][i] + elevatorMovingCost + 1;
 					}
 				}
 				i--;		
@@ -185,6 +245,38 @@ class Player {
 			return addedElevators;
 		}
 		
+		private boolean isElevator(int floor, int position) {
+			return initialElevators.getOrDefault(floor, Collections.emptyList()).contains(position) ||
+				   addedElevators.getOrDefault(floor, Collections.emptyList()).contains(position);
+		}
+		
+		public List<Direction> getActions(int startPosition) {
+			int floor = 0;
+			int position = startPosition;
+			List<Direction> actions = new ArrayList<>();
+			while (reachable[floor][position] > 1) {
+				if (isElevator(floor, position)) {
+					actions.add(Direction.NONE);
+					floor++;
+					continue;
+				}
+				if (position < reachable[floor].length - 1 && reachable[floor][position + 1] > 0 &&
+						reachable[floor][position + 1] < reachable[floor][position]) {
+					actions.add(Direction.RIGHT);
+					position++;
+					continue;
+				}
+				if (position > 0 && reachable[floor][position - 1] > 0 && 
+						reachable[floor][position - 1] < reachable[floor][position]) {
+					actions.add(Direction.LEFT);
+					position--;
+					continue;
+				}
+				throw new IllegalStateException("Nothing to do on floor "+floor+" at "+position);
+			}
+			return actions;
+		}
+		
 	}
 
 	public static void addElevator(int elevatorFloor, int elevatorPosition, Map<Integer, List<Integer>> allElevators) {
@@ -194,6 +286,10 @@ class Player {
 			allElevators.put(elevatorFloor, elevators);
 		}
 		elevators.add(elevatorPosition);
+	}
+	
+	public static void removeElevator(int elevatorFloor, Integer elevatorPosition, Map<Integer, List<Integer>> allElevators) {
+		allElevators.get(elevatorFloor).remove(elevatorPosition);
 	}
 	
 	static boolean movingOnRightDirection(Direction direction, int clonePosition, int targetPosition) {

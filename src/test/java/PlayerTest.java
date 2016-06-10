@@ -11,6 +11,32 @@ import org.junit.Test;
 public class PlayerTest {
 	
 	@Test
+	public void generateBestPath() throws Exception {
+		int width = 19;
+		int floors = 9;
+		int exitFloor = 9;
+		int exitPosition = 9;
+		Map<Integer, List<Integer>> elevators = new HashMap<>();
+		elevators.put(0, Arrays.asList(3, 9));
+		elevators.put(1, Arrays.asList(4, 17));
+		elevators.put(2, Arrays.asList(3, 9));
+		elevators.put(3, Arrays.asList(4, 17));
+		elevators.put(4, Arrays.asList(3, 9));
+		elevators.put(5, Arrays.asList(4, 17));
+		elevators.put(6, Arrays.asList(3, 9));
+		elevators.put(7, Arrays.asList(4, 17));
+		elevators.put(8, Arrays.asList(9));
+		int numberOfAdditionalElevators = 0;
+		int numberOfTurns = 47;
+		int startingPosition = 6;
+		Player.Reachable myReachable = new Player.Reachable(floors, width, exitFloor, exitPosition, elevators, 
+				Collections.emptyMap(), numberOfAdditionalElevators, numberOfTurns, startingPosition);
+		myReachable.generateReachable();
+		assertThat(myReachable.solved(Player.Direction.LEFT)).isTrue();
+		assertThat(myReachable.solved(Player.Direction.RIGHT)).isFalse();
+	}
+	
+	@Test
 	public void generatesReachable() throws Exception {
 
 		int width = 35;
@@ -27,7 +53,7 @@ public class PlayerTest {
 		Player.Reachable myReachable = new Player.Reachable(floors, width, exitFloor, exitPosition, elevators, 
 				Collections.emptyMap(), 4, 67, 6);
 		myReachable.generateReachable();
-		myReachable.generateReachable();
+		myReachable.optimizeAddedElevators();
 		int[][] reachable = myReachable.getReachable();
 		String expectedReachablePicture = 
 				"0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	\n"+
@@ -38,13 +64,12 @@ public class PlayerTest {
 				"0	42	41	40	39	38	37	36	35	34	33	32	31	30	29	28	27	26	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44	0	\n"+
 				"0	43	42	41	40	39	38	37	36	35	34	33	32	31	34	35	36	37	38	39	40	37	34	35	36	37	38	39	40	41	42	43	44	45	0	\n"+
 				"0	44	43	42	41	44	45	46	47	48	49	50	51	52	53	54	55	56	57	58	59	60	61	62	63	64	65	66	67	68	69	70	71	72	0	\n"+
-				"0	59	58	57	56	55	54	53	52	49	50	51	52	53	54	55	56	57	58	59	60	61	66	63	64	65	66	67	68	69	70	71	72	73	0	\n"+
-				"0	76	75	74	73	72	71	70	69	68	67	66	65	64	63	62	61	58	59	60	61	62	63	64	65	66	67	68	69	70	71	72	73	74	0	\n"+
-				"0	77	76	75	78	79	80	81	82	81	80	79	78	77	76	75	74	73	72	71	70	69	68	65	66	67	68	69	70	71	72	73	74	75	0	\n"+
-				"0	84	83	82	79	80	81	82	83	82	81	80	79	78	77	76	75	74	75	74	73	72	71	70	67	68	69	70	71	72	73	74	75	76	0	\n"+
-				"0	95	94	93	92	91	90	89	88	87	86	85	84	83	82	81	80	79	78	77	76	75	74	73	70	71	72	73	74	75	76	77	78	79	0	\n";
-		assertThat(print(reachable)).isEqualTo(expectedReachablePicture);
-
+				"0	49	48	45	46	47	48	49	52	49	50	51	52	53	54	55	56	57	58	59	60	61	66	63	64	65	66	67	68	69	70	71	72	73	0	\n"+
+				"0	52	51	48	49	50	51	52	53	54	55	56	57	58	59	60	61	58	59	60	61	62	63	64	65	66	67	68	69	70	71	72	73	74	0	\n"+
+				"0	53	52	49	50	51	52	53	54	55	56	57	58	59	60	61	62	63	64	65	66	67	68	65	66	67	68	69	70	71	72	73	74	75	0	\n"+
+				"0	56	55	54	51	52	53	54	55	56	57	58	59	60	61	62	67	64	65	66	67	68	69	70	67	68	69	70	71	72	73	74	75	76	0	\n"+
+				"0	59	58	57	54	55	56	57	58	59	60	61	62	63	64	65	66	67	68	69	70	71	72	73	74	75	76	77	78	79	80	81	82	83	0	\n";		assertThat(print(reachable)).isEqualTo(expectedReachablePicture);
+		System.out.println(myReachable.getAddedElevators());		
 		System.out.println(myReachable.getActions(6));
 	}
 

@@ -268,6 +268,7 @@ class Player {
 		public boolean solved(Direction direction) {
 			
 			int numberOfTurnsWithPossibleInitialTurn = numberOfTurns;
+			System.err.println(reachable[0][startingPosition]+"---"+numberOfTurnsWithPossibleInitialTurn);
 			if ((direction == Direction.LEFT && reachable[0][startingPosition] <= reachable[0][startingPosition - 1]) ||
 				(direction == Direction.RIGHT && reachable[0][startingPosition] <= reachable[0][startingPosition + 1])) {
 				numberOfTurnsWithPossibleInitialTurn-=3;
@@ -278,13 +279,21 @@ class Player {
 		public void optimizeAddedElevators() {
 			do {
 				int availableElevators = numberOfAdditionalElevators - addedElevators.keySet().size();
-				if (availableElevators < 1 || !addedFastestReacheableNewElevator()) {
+				if (availableElevators == 0) {
 					return;
 				}
+				if (addedFastestReacheableNewElevator()) {
+					continue;
+				}
+				if (tryReplacingOneAddedElevatorWithTwoElevators()) {
+					continue;
+				}
+				return;
 			}
 			while(true);
 			
 		}
+		
 		
 		public boolean generateReachable() {
 			for (int i = 0; i < reachable.length; i++) {
@@ -336,6 +345,82 @@ class Player {
 			return true;
 		}
 		
+		private boolean tryReplacingOneAddedElevatorWithTwoElevators() {
+			int min = reachable[0][startingPosition];
+			int minFloor = -1;
+			int minPosition = -1;
+			int addedElevatorToBeRemoved = -1;
+			for (int floor = 0; floor < exitFloor - 1; floor++) {
+				if (!addedElevators.containsKey(floor)) {
+					continue;
+				}
+				int currentElevator = addedElevators.get(floor).get(0);
+				removeElevator(floor, currentElevator, addedElevators);
+				FastestReachableTwoNewElevators newElevator = new FastestReachableTwoNewElevators(floor);	
+				newElevator.compute();
+				if (newElevator.min < min && newElevator.min > 0) {
+					min = newElevator.min;
+					minPosition = newElevator.position;
+					minFloor = floor;
+					addedElevatorToBeRemoved = currentElevator;
+				}
+				addElevator(floor, currentElevator, addedElevators);
+			}
+			if (minFloor > -1) {
+				removeElevator(minFloor, addedElevatorToBeRemoved, addedElevators);
+				addElevator(minFloor, minPosition, addedElevators);
+				addElevator(minFloor + 1, minPosition, addedElevators);
+				generateReachable();
+				return true;
+			}
+			return false;
+		}
+		
+		private class FastestReachableTwoNewElevators {
+			private final int floor;
+			private final Integer[] candidates;
+			private int min = Integer.MAX_VALUE;
+			private int position = -1;
+			
+			public FastestReachableTwoNewElevators(int floor) {
+				this.floor = floor;
+				List<Integer> localMinimaFromAboveFloor = new ArrayList<>();
+				int topFloor = floor + 2;
+				for (int i = 1; i < reachable[topFloor].length - 1; i++) {
+					if ((reachable[topFloor][i] > 0)
+							&&
+						(reachable[topFloor][i-1] == 0 || reachable[topFloor][i-1] > reachable[topFloor][i])&&
+						(reachable[topFloor][i+1] == 0 || reachable[topFloor][i+1] > reachable[topFloor][i])
+						) {
+						localMinimaFromAboveFloor.add(i);
+					}
+				}
+				candidates = localMinimaFromAboveFloor.toArray(new Integer[localMinimaFromAboveFloor.size()]);
+			}
+
+			public void compute() {
+				
+				for (int j = 0; j < candidates.length; j++) {
+					int i = candidates[j];
+					if (isElevator(floor, i) || isElevator(floor + 1, i)) {
+						continue;
+					}
+					addElevator(floor, i, addedElevators);
+					addElevator(floor + 1, i, addedElevators);
+					Reachable child = new Reachable(Reachable.this);
+					if (child.generateReachable() && child.reachable[0][startingPosition] < min && 
+							child.reachable[0][startingPosition] > 0) {
+						position = i;
+						min = child.reachable[0][startingPosition];
+					
+					}
+					removeElevator(floor, i, addedElevators);
+					removeElevator(floor + 1, i, addedElevators);
+				}
+			}
+		}
+
+		
 		private boolean addedFastestReacheableNewElevator() {
 			int min = reachable[0][startingPosition];
 			int minFloor = -1;
@@ -361,9 +446,6 @@ class Player {
 		}
 		
 		private int findFastestReachableNewElevator(int floor) {
-			if (numberOfTurns > 99) {
-				return startingPosition;
-			}
 			FastestReachableNewElevator fastestReachableNewElevator = new FastestReachableNewElevator(floor);
 			fastestReachableNewElevator.compute();
 			return fastestReachableNewElevator.position;
@@ -371,16 +453,30 @@ class Player {
 		
 		private class FastestReachableNewElevator {
 			private final int floor;
+			private final Integer[] candidates;
 			private int min = Integer.MAX_VALUE;
 			private int position = -1;
 			
 			public FastestReachableNewElevator(int floor) {
 				this.floor = floor;
+				List<Integer> localMinimaFromAboveFloor = new ArrayList<>();
+				int topFloor = floor + 1;
+				for (int i = 1; i < reachable[topFloor].length - 1; i++) {
+					if ((reachable[topFloor][i] > 0)
+							&&
+						(reachable[topFloor][i-1] == 0 || reachable[topFloor][i-1] > reachable[topFloor][i])&&
+						(reachable[topFloor][i+1] == 0 || reachable[topFloor][i+1] > reachable[topFloor][i])
+						) {
+						localMinimaFromAboveFloor.add(i);
+					}
+				}
+				candidates = localMinimaFromAboveFloor.toArray(new Integer[localMinimaFromAboveFloor.size()]);
 			}
 
 			public void compute() {
 				
-				for (int i = 2; i < reachable[floor].length - 2; i++) {
+				for (int j = 0; j < candidates.length; j++) {
+					int i = candidates[j];
 					if (isElevator(floor, i)) {
 						continue;
 					}

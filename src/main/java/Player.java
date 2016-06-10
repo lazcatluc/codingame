@@ -3,8 +3,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -23,18 +25,107 @@ class Player {
         for (int i = 0; i < height; i++) {
         	map.add(in.nextLine()); // one line of the firewall grid
         }
-
+        int rounds = in.nextInt(); // number of rounds left before the end of the game
+        int bombs = in.nextInt(); // number of bombs left
+        SetCoverGenerator setCoverGenerator = makeSetCoverGenerator(map, width, height, bombs);
+        Iterator<Node> nodes = setCoverGenerator.getNodesCoveringAllNodes().iterator();
         // game loop
         while (true) {
-            int rounds = in.nextInt(); // number of rounds left before the end of the game
-            int bombs = in.nextInt(); // number of bombs left
-
+         
+        	
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
-
-            System.out.println("3 0");
+        	if (nodes.hasNext()) {
+        		Node node = nodes.next();
+        		System.out.println(node.x+" "+node.y);
+        	}
+        	else {
+        		System.out.println("WAIT");
+        	}
+            rounds = in.nextInt(); // number of rounds left before the end of the game
+            bombs = in.nextInt(); // number of bombs left
         }
     }
+	
+	static SetCoverGenerator makeSetCoverGenerator(List<String> map, int width, int height, int maxBombs) {
+		BombMap bombMap = new BombMap(map);
+		return new SetCoverGenerator(new ReasonableLocationsGenerator(bombMap, width, height).getReasonableLocation(), 
+				new RelevantNodeFinder(bombMap, width, height).getRelevantNodes(), maxBombs);
+	}
+	
+	static Map<Node, Set<Node>> deepCopy(Map<Node, Set<Node>> original) {
+		Map<Node, Set<Node>> ret = new LinkedHashMap<>();
+		original.forEach((node, set) -> ret.put(node, new HashSet<>(set)));
+		return ret;
+	}
+	
+	static class RelevantNodeFinder {
+		private final BombMap bombMap;
+		private final int width;
+		private final int height;
+
+		public RelevantNodeFinder(BombMap bombMap, int width, int height) {
+			this.bombMap = bombMap;
+			this.width = width;
+			this.height = height;
+		}
+		
+		public Set<Node> getRelevantNodes() {
+			Set<Node> relevantNodes = new HashSet<>();
+			for (int x = 0; x < width; x++) {
+				for (int y = 0; y < height; y++) {					
+					if (bombMap.charAt(x, y) == '@') {
+						relevantNodes.add(new Node(x, y));
+					}
+				}
+			}
+			return relevantNodes;
+		}
+	}
+	
+	static class SetCoverGenerator {
+		private final Map<Node, Set<Node>> reasonableLocations;
+		private final Set<Node> allNodes;
+		private final int maxBombs;
+		
+		public SetCoverGenerator(Map<Node, Set<Node>> reasonableLocations, Set<Node> allNodes, int maxBombs) {
+			this.reasonableLocations = deepCopy(reasonableLocations);
+			this.allNodes = new HashSet<>(allNodes);
+			this.maxBombs = maxBombs;
+		}
+		
+		public Set<Node> getNodesCoveringAllNodes() {
+			if (allNodes.isEmpty()) {
+				return new HashSet<>();
+			}
+			if (reasonableLocations.isEmpty() || maxBombs == 0) {
+				return null;
+			}
+			Iterator<Entry<Node, Set<Node>>> iterator = reasonableLocations.entrySet().iterator();
+			while (iterator.hasNext()) {
+				Map.Entry<Node, Set<Node>> currentNode = iterator.next();
+				Map<Node, Set<Node>> myReasonableLocations = deepCopy(reasonableLocations);
+				Set<Node> myAllNodes = new HashSet<>(allNodes);
+				Node node = currentNode.getKey();
+				Set<Node> coveredNodes = currentNode.getValue();
+				myReasonableLocations.remove(node);
+				myAllNodes.removeAll(coveredNodes);
+				myReasonableLocations.values().forEach(set -> set.removeAll(coveredNodes));
+				List<Node> reasonableNodes = new ArrayList<>(myReasonableLocations.keySet());
+				Collections.sort(reasonableNodes, (node1, node2) -> 
+						myReasonableLocations.get(node2).size() - 
+						myReasonableLocations.get(node1).size());
+				Map<Node, Set<Node>> ret = new LinkedHashMap<>();
+				reasonableNodes.forEach(myNode -> ret.put(myNode, new HashSet<>(myReasonableLocations.get(myNode))));
+				Set<Node> subset = new SetCoverGenerator(myReasonableLocations, myAllNodes, maxBombs - 1).getNodesCoveringAllNodes();
+				if (subset != null) {
+					subset.add(node);
+					return subset;
+				}
+			}
+			return null;
+		}
+	}
 	
 	static class ReasonableLocationsGenerator {
 		private final BombMap bombMap;
@@ -47,7 +138,7 @@ class Player {
 			this.height = height;
 		}
 		
-		public List<Node> getReasonableLocation() {
+		public Map<Node, Set<Node>> getReasonableLocation() {
 			Map<Node, Set<Node>> affectedAreas = new HashMap<>();
 			for (int x = 0; x < width; x++) {
 				for (int y = 0; y < height; y++) {					
@@ -69,7 +160,10 @@ class Player {
 			Collections.sort(reasonableLocationsMostAffectedNodesFirst, (node1, node2) -> 
 				affectedAreasExcludingThoseAlreadyIncluded.get(node2).size()-
 				affectedAreasExcludingThoseAlreadyIncluded.get(node1).size());
-			return reasonableLocationsMostAffectedNodesFirst;
+			Map<Node, Set<Node>> ret = new LinkedHashMap<>();
+			reasonableLocationsMostAffectedNodesFirst.forEach(node -> ret.put(node,
+					new HashSet<>(affectedAreasExcludingThoseAlreadyIncluded.get(node))));
+			return ret;
 		}
 		
 		private void removeAllIncluded(Map<Node, Set<Node>> nodes, Set<Node> container) {

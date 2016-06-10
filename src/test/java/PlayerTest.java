@@ -4,7 +4,10 @@ import static org.junit.Assert.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.Test;
 
@@ -19,6 +22,12 @@ public class PlayerTest {
 			".......",
 			".......");
 	
+	
+	@Test
+	public void generatesRelevantNodes() throws Exception {
+		assertThat(new Player.RelevantNodeFinder(newMap(map), 7, 7).getRelevantNodes())
+			.isEqualTo(new HashSet<>(Arrays.asList(new Player.Node(3, 0), new Player.Node(5, 3), new Player.Node(6, 3))));
+	}
 	
 	@Test
 	public void generatesAffectedNodes33() throws Exception {
@@ -36,7 +45,20 @@ public class PlayerTest {
 	@Test
 	public void generatesReasonableLocations() throws Exception {
 		assertThat(new Player.ReasonableLocationsGenerator(newMap(map), 7, 7).getReasonableLocation())
-				.contains(new Player.Node(6, 0), new Player.Node(5, 0));
+				.containsKeys(new Player.Node(6, 0), new Player.Node(5, 0));
+	}
+	
+	@Test
+	public void coversSetOptimally() throws Exception {
+		Map<Player.Node, Set<Player.Node>> reasonableLocations = new LinkedHashMap<>();
+		reasonableLocations.put(new Player.Node(6, 0), new HashSet<>(Arrays.asList(new Player.Node(3,0), new Player.Node(6, 3))));
+		reasonableLocations.put(new Player.Node(3, 3), new HashSet<>(Arrays.asList(new Player.Node(6,3))));
+		reasonableLocations.put(new Player.Node(5, 0), new HashSet<>(Arrays.asList(new Player.Node(3,0), new Player.Node(5, 3))));
+		
+		Set<Player.Node> allNodes = new HashSet<>(Arrays.asList(new Player.Node(6,3), new Player.Node(5, 3), new Player.Node(3,0)));
+		assertThat(new Player.SetCoverGenerator(reasonableLocations , allNodes , 2).getNodesCoveringAllNodes()).isEqualTo(
+				new HashSet<>(Arrays.asList(new Player.Node(5, 0), new Player.Node(6, 0))));
+		assertThat(new Player.SetCoverGenerator(reasonableLocations , allNodes , 1).getNodesCoveringAllNodes()).isNull();
 	}
 
 	protected Player.BombMap newMap(List<String> map) {

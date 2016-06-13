@@ -7,6 +7,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
+
 import java.util.Scanner;
 import java.util.Set;
 
@@ -26,9 +28,27 @@ class Player {
         	map.add(in.nextLine()); // one line of the firewall grid
         }
         int rounds = in.nextInt(); // number of rounds left before the end of the game
-        int bombs = in.nextInt(); // number of bombs left
-        SetCoverGenerator setCoverGenerator = makeSetCoverGenerator(map, width, height, bombs);
-        Iterator<Node> nodes = setCoverGenerator.getNodesCoveringAllNodes().iterator();
+        int bombs = in.nextInt();
+		BombMap bombMap = new BombMap(map); // number of bombs left
+        Map<Node, Set<Node>> reasonableLocations = new ReasonableLocationsGenerator(bombMap).getReasonableLocation();
+		SetCoverGenerator setCoverGenerator = new SetCoverGenerator(reasonableLocations, 
+		new RelevantNodeFinder(bombMap).getRelevantNodes(), bombs, bombMap);
+        List<Node> nodesCoveringAllNodes = setCoverGenerator.getNodesCoveringAllNodes();
+        if (nodesCoveringAllNodes == null) {
+        	Node node = setCoverGenerator.getFirstNode();
+			List<Node> nodesWithWait = new ArrayList<>();
+			nodesWithWait.add(node);
+			nodesWithWait.add(null);
+			nodesWithWait.add(null);
+			bombMap.clear(reasonableLocations.get(node));
+			nodesCoveringAllNodes = new SetCoverGenerator(new ReasonableLocationsGenerator(bombMap).getReasonableLocation(), 
+				new RelevantNodeFinder(bombMap).getRelevantNodes(), bombs - 1, bombMap).getNodesCoveringAllNodes();
+			if (nodesCoveringAllNodes != null) {
+				nodesWithWait.addAll(nodesCoveringAllNodes);
+			}
+			nodesCoveringAllNodes = nodesWithWait;
+        }
+		Iterator<Node> nodes = nodesCoveringAllNodes.iterator();
         // game loop
         while (true) {
          
@@ -37,7 +57,12 @@ class Player {
             // To debug: System.err.println("Debug messages...");
         	if (nodes.hasNext()) {
         		Node node = nodes.next();
-        		System.out.println(node.x+" "+node.y);
+        		if (node == null) {
+        			System.out.println("WAIT");
+        		}
+        		else {
+        			System.out.println(node.x+" "+node.y);
+        		}
         	}
         	else {
         		System.out.println("WAIT");
@@ -46,12 +71,6 @@ class Player {
             bombs = in.nextInt(); // number of bombs left
         }
     }
-	
-	static SetCoverGenerator makeSetCoverGenerator(List<String> map, int width, int height, int maxBombs) {
-		BombMap bombMap = new BombMap(map);
-		return new SetCoverGenerator(new ReasonableLocationsGenerator(bombMap, width, height).getReasonableLocation(), 
-				new RelevantNodeFinder(bombMap, width, height).getRelevantNodes(), maxBombs);
-	}
 	
 	static Map<Node, Set<Node>> deepCopy(Map<Node, Set<Node>> original) {
 		Map<Node, Set<Node>> ret = new LinkedHashMap<>();
@@ -64,10 +83,10 @@ class Player {
 		private final int width;
 		private final int height;
 
-		public RelevantNodeFinder(BombMap bombMap, int width, int height) {
+		public RelevantNodeFinder(BombMap bombMap) {
 			this.bombMap = bombMap;
-			this.width = width;
-			this.height = height;
+			this.width = bombMap.getWidth();
+			this.height = bombMap.getHeight();
 		}
 		
 		public Set<Node> getRelevantNodes() {
@@ -87,16 +106,22 @@ class Player {
 		private final Map<Node, Set<Node>> reasonableLocations;
 		private final Set<Node> allNodes;
 		private final int maxBombs;
+		private final BombMap bombMap;
 		
-		public SetCoverGenerator(Map<Node, Set<Node>> reasonableLocations, Set<Node> allNodes, int maxBombs) {
+		public SetCoverGenerator(Map<Node, Set<Node>> reasonableLocations, Set<Node> allNodes, int maxBombs, BombMap bombMap) {
 			this.reasonableLocations = deepCopy(reasonableLocations);
 			this.allNodes = new HashSet<>(allNodes);
 			this.maxBombs = maxBombs;
+			this.bombMap = bombMap;
 		}
 		
-		public Set<Node> getNodesCoveringAllNodes() {
+		public Node getFirstNode() {
+			return reasonableLocations.keySet().iterator().next();
+		}
+		
+		public List<Node> getNodesCoveringAllNodes() {
 			if (allNodes.isEmpty()) {
-				return new HashSet<>();
+				return new ArrayList<>();
 			}
 			if (reasonableLocations.isEmpty() || maxBombs == 0) {
 				return null;
@@ -117,7 +142,7 @@ class Player {
 						myReasonableLocations.get(node1).size());
 				Map<Node, Set<Node>> ret = new LinkedHashMap<>();
 				reasonableNodes.forEach(myNode -> ret.put(myNode, new HashSet<>(myReasonableLocations.get(myNode))));
-				Set<Node> subset = new SetCoverGenerator(myReasonableLocations, myAllNodes, maxBombs - 1).getNodesCoveringAllNodes();
+				List<Node> subset = new SetCoverGenerator(myReasonableLocations, myAllNodes, maxBombs - 1, bombMap).getNodesCoveringAllNodes();
 				if (subset != null) {
 					subset.add(node);
 					return subset;
@@ -132,10 +157,10 @@ class Player {
 		private final int width;
 		private final int height;
 		
-		public ReasonableLocationsGenerator(BombMap bombMap, int width, int height) {
+		public ReasonableLocationsGenerator(BombMap bombMap) {
 			this.bombMap = bombMap;
-			this.width = width;
-			this.height = height;
+			this.width = bombMap.getWidth();
+			this.height = bombMap.getHeight();
 		}
 		
 		public Map<Node, Set<Node>> getReasonableLocation() {
@@ -216,9 +241,22 @@ class Player {
 	static class BombMap {
 		private final int bombPower = 3;
 		private final List<String> map;
+		private final Set<Node> clearedNodes = new HashSet<>();
 		
 		public BombMap(List<String> map) {
 			this.map = new ArrayList<>(map);
+		}
+		
+		public int getHeight() {
+			return map.size();
+		}
+
+		public int getWidth() {
+			return map.get(0).length();
+		}
+
+		public void clear(Set<Node> nodes) {
+			clearedNodes.addAll(nodes);
 		}
 
 		public Set<Node> getAffectedNodes(Node node) {
@@ -227,14 +265,21 @@ class Player {
 			left(node, nodes);
 			down(node, nodes);
 			up(node, nodes);
-			return nodes;
+			return nodes.stream().filter(myNode -> !isCleared(myNode.x, myNode.y)).collect(Collectors.toSet());
 		}
 
 		protected char charAt(int x, int y) {
-			if (x < 0 || x >= map.get(0).length() || y < 0 || y >= map.size()) {
+			if (x < 0 || x >= getWidth() || y < 0 || y >= getHeight()) {
+				return '.';
+			}
+			if (isCleared(x, y)) {
 				return '.';
 			}
 			return map.get(y).charAt(x);
+		}
+
+		private boolean isCleared(int x, int y) {
+			return clearedNodes.contains(new Node(x, y));
 		}
 
 		protected void up(Node node, Set<Node> nodes) {
@@ -289,3 +334,4 @@ class Player {
 		}
 	}
 }
+

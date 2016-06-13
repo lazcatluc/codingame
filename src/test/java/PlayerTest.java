@@ -25,7 +25,7 @@ public class PlayerTest {
 	
 	@Test
 	public void generatesRelevantNodes() throws Exception {
-		assertThat(new Player.RelevantNodeFinder(newMap(map), 7, 7).getRelevantNodes())
+		assertThat(new Player.RelevantNodeFinder(newMap(map)).getRelevantNodes())
 			.isEqualTo(new HashSet<>(Arrays.asList(new Player.Node(3, 0), new Player.Node(5, 3), new Player.Node(6, 3))));
 	}
 	
@@ -44,7 +44,7 @@ public class PlayerTest {
 
 	@Test
 	public void generatesReasonableLocations() throws Exception {
-		assertThat(new Player.ReasonableLocationsGenerator(newMap(map), 7, 7).getReasonableLocation())
+		assertThat(new Player.ReasonableLocationsGenerator(newMap(map)).getReasonableLocation())
 				.containsKeys(new Player.Node(6, 0), new Player.Node(5, 0));
 	}
 	
@@ -55,10 +55,11 @@ public class PlayerTest {
 		reasonableLocations.put(new Player.Node(3, 3), new HashSet<>(Arrays.asList(new Player.Node(6,3))));
 		reasonableLocations.put(new Player.Node(5, 0), new HashSet<>(Arrays.asList(new Player.Node(3,0), new Player.Node(5, 3))));
 		
+		Player.BombMap bombMap = newMap(map);
 		Set<Player.Node> allNodes = new HashSet<>(Arrays.asList(new Player.Node(6,3), new Player.Node(5, 3), new Player.Node(3,0)));
-		assertThat(new Player.SetCoverGenerator(reasonableLocations , allNodes , 2).getNodesCoveringAllNodes()).isEqualTo(
+		assertThat(new HashSet<>(new Player.SetCoverGenerator(reasonableLocations , allNodes , 2, bombMap).getNodesCoveringAllNodes())).isEqualTo(
 				new HashSet<>(Arrays.asList(new Player.Node(5, 0), new Player.Node(6, 0))));
-		assertThat(new Player.SetCoverGenerator(reasonableLocations , allNodes , 1).getNodesCoveringAllNodes()).isNull();
+		assertThat(new Player.SetCoverGenerator(reasonableLocations , allNodes , 1, bombMap).getNodesCoveringAllNodes()).isNull();
 	}
 
 	protected Player.BombMap newMap(List<String> map) {

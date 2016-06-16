@@ -50,22 +50,39 @@ class Player {
 	static class Location {
 		private final int x;
 		private final int y;
+
 		public Location(int x, int y) {
 			this.x = x;
 			this.y = y;
 		}
+
 		public Location moveTo(Direction direction) {
 			switch (direction) {
-			case UP: return new Location(x, y - 1);
-			case DOWN: return new Location(x, y + 1);
-			case LEFT: return new Location(x - 1, y);
-			case RIGHT: return new Location(x + 1, y);
-			default: throw new IllegalArgumentException(direction.toString());
+			case UP:
+				return new Location(x, y - 1);
+			case DOWN:
+				return new Location(x, y + 1);
+			case LEFT:
+				return new Location(x - 1, y);
+			case RIGHT:
+				return new Location(x + 1, y);
+			default:
+				throw new IllegalArgumentException(direction.toString());
 			}
 		}
-		public boolean isOnTheMap(List<String> map) {
+
+		public boolean isOnTheMapAndNotBlocked(List<String> map) {
+			return isOnTheMap(map) && !isBlocked(map);
+		}
+
+		private boolean isBlocked(List<String> map) {
+			return map.get(y).charAt(x) == '#';
+		}
+
+		protected boolean isOnTheMap(List<String> map) {
 			return y >= 0 && x >= 0 && y < map.size() && x < map.get(0).length();
 		}
+
 		@Override
 		public int hashCode() {
 			final int prime = 31;
@@ -74,6 +91,7 @@ class Player {
 			result = prime * result + y;
 			return result;
 		}
+
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -89,20 +107,23 @@ class Player {
 				return false;
 			return true;
 		}
+
 		@Override
 		public String toString() {
 			return "[x=" + x + ", y=" + y + "]";
 		}
+
 		public Set<Location> getNeighbors() {
 			return Arrays.stream(Direction.values()).map(this::moveTo).collect(Collectors.toSet());
 		}
+
 		public Set<Location> getNeighborsAndSelf() {
 			Set<Location> ret = new HashSet<>();
 			ret.add(this);
 			ret.addAll(getNeighbors());
 			return ret;
 		}
-		
+
 	}
 	
 	static Direction getDirectionFromTo(Location first, Location second) {
@@ -138,7 +159,7 @@ class Player {
 
 	private static void keepMovingUntilFirstIsReached(List<String> map, Direction direction,
 			ArrayList<Location> trajectory, Location location, Location first) {
-		while (location.isOnTheMap(map) && !first.equals(location)) {
+		while (location.isOnTheMapAndNotBlocked(map) && !first.equals(location)) {
 			trajectory.add(location);
 			location = location.moveTo(direction);
 		}		
@@ -146,7 +167,7 @@ class Player {
 
 	protected static Location keepMovingUntilMarginIsReached(List<String> map, Direction direction,
 			ArrayList<Location> trajectory, Location location) {
-		while (location.isOnTheMap(map)) {
+		while (location.isOnTheMapAndNotBlocked(map)) {
 			trajectory.add(location);
 			location = location.moveTo(direction);
 		}

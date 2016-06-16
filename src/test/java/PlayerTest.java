@@ -161,27 +161,27 @@ public class PlayerTest {
 	
 	@Test
 	public void zeroZeroOnTheMap() throws Exception {
-		assertThat(new Player.Location(0, 0).isOnTheMap(emptyMap())).isTrue();
+		assertThat(new Player.Location(0, 0).isOnTheMapAndNotBlocked(emptyMap())).isTrue();
 	}
 	
 	@Test
 	public void zeroMinusNotOnTheMap() throws Exception {
-		assertThat(new Player.Location(0, -1).isOnTheMap(emptyMap())).isFalse();
+		assertThat(new Player.Location(0, -1).isOnTheMapAndNotBlocked(emptyMap())).isFalse();
 	}
 	
 	@Test
 	public void minusZeroNotOnTheMap() throws Exception {
-		assertThat(new Player.Location(-1, 0).isOnTheMap(emptyMap())).isFalse();
+		assertThat(new Player.Location(-1, 0).isOnTheMapAndNotBlocked(emptyMap())).isFalse();
 	}
 	
 	@Test
 	public void zero100NotOnTheMap() throws Exception {
-		assertThat(new Player.Location(0, 100).isOnTheMap(emptyMap())).isFalse();
+		assertThat(new Player.Location(0, 100).isOnTheMapAndNotBlocked(emptyMap())).isFalse();
 	}
 	
 	@Test
 	public void hundredZeroNotOnTheMap() throws Exception {
-		assertThat(new Player.Location(100, 0).isOnTheMap(emptyMap())).isFalse();
+		assertThat(new Player.Location(100, 0).isOnTheMapAndNotBlocked(emptyMap())).isFalse();
 	}
 
 	protected List<String> emptyMap() {
@@ -245,6 +245,21 @@ public class PlayerTest {
 				new HashSet<>(Arrays.asList(new Player.Location(1, 0), new Player.Location(0, 1)))))
 		.isEqualTo(new HashSet<>(Arrays.asList(new Player.Node(emptyMap(), new Player.Location(0, 0), new Player.Location(1, 0)),
 				new Player.Node(emptyMap(), new Player.Location(0, 0), new Player.Location(0, 1)))));
+	}
+	
+	@Test
+	public void movingDownWithBounceOnObstacle() throws Exception {
+		assertThat(Player.buildTrajectory(borderedMap(), new Player.Location(2, 2), new Player.Location(2, 1)))
+		.isEqualTo(Arrays.asList(new Player.Location(2, 2), new Player.Location(2, 1),
+				new Player.Location(2, 2), new Player.Location(2, 3)));
+	}
+
+	private List<String> borderedMap() {
+		return Arrays.asList("#####",
+							 "#...#", 
+							 "#...#", 
+							 "#...#", 
+							 "#####");
 	}
 }
 

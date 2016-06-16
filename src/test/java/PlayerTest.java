@@ -1,5 +1,4 @@
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -8,8 +7,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class PlayerTest {
@@ -225,9 +224,13 @@ public class PlayerTest {
 	
 	@Test
 	public void buildsFixedNode() throws Exception {
-		assertThat(Player.Node.getNodes(emptyMap(), Collections.singleton(new Player.Location(1, 0)), 
-				Collections.singleton(new Player.Location(1, 0))))
+		assertThat(fixedNode())
 		.isEqualTo(Collections.singleton(new Player.Node(emptyMap(), new Player.Location(1, 0), new Player.Location(1, 0))));
+	}
+
+	protected Set<Player.Node> fixedNode() {
+		return Player.Node.getNodes(emptyMap(), Collections.singleton(new Player.Location(1, 0)), 
+				Collections.singleton(new Player.Location(1, 0)));
 	}
 	
 	@Test
@@ -240,11 +243,24 @@ public class PlayerTest {
 	
 	@Test
 	public void buildsNodesStartingFromOverlapping() throws Exception {
-		assertThat(Player.Node.getNodes(emptyMap(), 
-				Collections.singleton(new Player.Location(0, 0)), 
-				new HashSet<>(Arrays.asList(new Player.Location(1, 0), new Player.Location(0, 1)))))
+		assertThat(nodesStartingFromOverlapping())
 		.isEqualTo(new HashSet<>(Arrays.asList(new Player.Node(emptyMap(), new Player.Location(0, 0), new Player.Location(1, 0)),
 				new Player.Node(emptyMap(), new Player.Location(0, 0), new Player.Location(0, 1)))));
+	}
+
+	protected Set<Player.Node> nodesStartingFromOverlapping() {
+		return Player.Node.getNodes(emptyMap(), 
+				Collections.singleton(new Player.Location(0, 0)), 
+				new HashSet<>(Arrays.asList(new Player.Location(1, 0), new Player.Location(0, 1))));
+	}
+	
+	@Test
+	public void computesNodesLocationsAtALaterRound() throws Exception {
+		Player.Game game = new Player.Game(nodesStartingFromOverlapping(), Collections.emptySet());
+		game.nextRound();
+		game.nextRound();
+		assertThat(game.getNodeLocations()).isEqualTo(
+				new HashSet<>(Arrays.asList(new Player.Location(3, 0), new Player.Location(0, 3))));
 	}
 	
 	@Test
@@ -252,6 +268,17 @@ public class PlayerTest {
 		assertThat(Player.buildTrajectory(borderedMap(), new Player.Location(2, 2), new Player.Location(2, 1)))
 		.isEqualTo(Arrays.asList(new Player.Location(2, 2), new Player.Location(2, 1),
 				new Player.Location(2, 2), new Player.Location(2, 3)));
+	}
+	
+	@Test
+	public void addedBombBlowsAfterThreeRoundsDestroyingAdiacentNode() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet());
+		game.placeBombAt(new Player.Location(0,0));
+		game.nextRound();
+		game.nextRound();
+		game.nextRound();
+		
+		assertThat(game.getNodeLocations()).isEmpty();
 	}
 
 	private List<String> borderedMap() {

@@ -1,20 +1,14 @@
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalDouble;
-import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -222,10 +216,83 @@ class Player {
 		
 	}
 	
+	static class Game {
+		private static final int BOMB_EXPIRATION = 3;
+		private static final int BOMB_POWER = 3;
+		private int round = 1;
+		private final Set<Node> nodes;
+		private final Set<Location> obstacles;
+		private Map<Location, Integer> bombsWithExpiration = new HashMap<>();
+		
+		public Game(Set<Node> nodes, Set<Location> obstacles) {
+			this.nodes = nodes;
+			this.obstacles = obstacles;
+		}
+		
+		private Location getNodeLocation(Node node) {
+			return node.trajectory.get(round % node.trajectory.size());
+		}
+
+		public void nextRound() {
+			round++;
+			triggerBombs();
+		}
+
+		private void triggerBombs() {
+			Set<Location> bombsToBeTriggered = bombsToBeTriggered();
+			bombsWithExpiration.keySet().removeAll(bombsToBeTriggered);
+			Map<Location, Integer> newBombsWithExpriration = new HashMap<>();
+			bombsWithExpiration.forEach((key, value) -> newBombsWithExpriration.put(key, value - 1));
+			bombsWithExpiration = newBombsWithExpriration;
+			bombsToBeTriggered.forEach(this::triggerBomb);
+		}
+
+		private Set<Location> bombsToBeTriggered() {
+			Set<Location> expiredBombs = bombsWithExpiration.entrySet().stream()
+					.filter(entry -> entry.getValue().equals(1)).map(Map.Entry::getKey).collect(Collectors.toSet());
+			return expiredBombs;
+		}
+		
+		private void triggerBomb(Location location) {
+			Set<Location> accessibleLocations = new HashSet<>(getAccessibleLocationsFrom(location));
+			accessibleLocations.retainAll(getNodeLocations());
+			Iterator<Node> nodeIt = nodes.iterator();
+			while (nodeIt.hasNext()) {
+				if (accessibleLocations.contains(getNodeLocation(nodeIt.next()))) {
+					nodeIt.remove();
+				}
+			}
+		}
+
+		private Set<Location> getAccessibleLocationsFrom(Location location) {
+			Set<Location> accessibleLocations = new HashSet<>();
+			accessibleLocations.add(location);
+			Arrays.stream(Direction.values()).forEach(direction -> {
+				Location myLocation = location;
+				for (int i = 0; i < BOMB_POWER; i++) {
+					myLocation = myLocation.moveTo(direction);
+					if (obstacles.contains(myLocation)) {
+						break;
+					}
+					accessibleLocations.add(myLocation);
+				}
+			});
+			return accessibleLocations;
+		}
+
+		public Set<Location> getNodeLocations() {
+			return nodes.stream().map(this::getNodeLocation).collect(Collectors.toSet());
+		}
+
+		public void placeBombAt(Location location) {
+			bombsWithExpiration.put(location, BOMB_EXPIRATION);
+		}
+	}
+	
 	static class GameRound {
-		final int rounds;
-		final int bombs;
-		final List<String> map;
+		private final int rounds;
+		private final int bombs;
+		private final List<String> map;
 		
 		GameRound(MyCustomScanner in, int height) {
 			rounds = in.nextInt();

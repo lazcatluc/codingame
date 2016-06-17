@@ -34,11 +34,15 @@ class Player {
         Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
         Game game = new Game(nodes, round.getObstacles(), width, height);
         Queue<Location> bombsToBePlaced = new LinkedList<>();
-        
+        GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game, round.bombs);
+        if (solver.isSolved()) {
+        	System.err.println("Solved: "+solver.getBombLocations());
+        	bombsToBePlaced.addAll(solver.getBombLocations());
+        }
         // game loop
         while (true) {
         	if (bombsToBePlaced.isEmpty()) {
-        		bombsToBePlaced.addAll(new BombWithHighestDamage(game).getBombLocations());
+        		bombsToBePlaced.addAll(new BombWithHighestDamageAndPatience(game, 10).getBombLocations());
         	}
         	Location nextBomb = bombsToBePlaced.poll();
             // Write an action using System.out.println()
@@ -62,18 +66,112 @@ class Player {
 		List<Location> getBombLocations();
 	}
 	
-	static class BombWithHighestDamage implements BombStrategy {
+	static class GameSolverWithStrategyAndWait implements BombStrategy {
 		private final Game game;
+		private final int availableBombs;
+		private final boolean solved;
+		private final List<Location> bombLocations = new ArrayList<>();
+
+		public GameSolverWithStrategyAndWait(Game game, int availableBombs) {
+			this.game = new Game(game);
+			this.availableBombs = availableBombs;
+			boolean solved = trySolve();
+			if (!solved && availableBombs == 1) {
+				for (int i = 0; i < 50 && !solved; i++) {
+					bombLocations.add(null);
+					this.game.nextRound();
+					solved = trySolve(); 
+				}
+			}
+			this.solved = solved;
+		}
+
+		private boolean trySolve() {
+			if (game.nodes.isEmpty()) {
+				return true;
+			}
+			if (availableBombs == 0) {
+				return false;
+			}
+			Location bombLocation = new BombWithHighestDamage(game).getBombLocations().get(0);
+			GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game.simulateBombAt(bombLocation),
+					availableBombs - 1);
+			if (solver.solved) {
+				bombLocations.addAll(Arrays.asList(bombLocation, null, null));
+				bombLocations.addAll(solver.getBombLocations());
+				return true;
+			}
+			return false;
+		}
 		
-		public BombWithHighestDamage(Game game) {
+		public boolean isSolved() {
+			return solved;
+		}
+		
+		@Override
+		public List<Location> getBombLocations() {
+			return Collections.unmodifiableList(bombLocations);
+		}
+		
+		
+	}
+	
+	static class BombWithHighestDamageAndPatience implements BombStrategy {
+		private final Game game;
+		private final int maxWait;
+		
+		public BombWithHighestDamageAndPatience(Game game, int maxWait) {
 			this.game = game;
+			this.maxWait = maxWait;
 		}
 
 		@Override
 		public List<Location> getBombLocations() {
-			return Arrays.asList(game.getBombableLocations().stream().collect(
-					Collectors.toMap(loc -> loc, loc -> game.newBombDamage(loc)))
-					.entrySet().stream().max((entry1, entry2) -> entry1.getValue() - entry2.getValue()).get().getKey(), null, null);
+			int waits = 0;
+			Location maxLocation = null;
+			int maxDamage = 0;
+			Game game = new Game(this.game);
+			for (int i = 0; i < maxWait; i++) {
+				BombWithHighestDamage bombWithHighestDamage = new BombWithHighestDamage(game);
+				Location location = bombWithHighestDamage.getBombLocations().get(0);
+				int damage = bombWithHighestDamage.getBombValue(location);
+				if (damage > maxDamage) {
+					waits = i;
+					maxDamage = damage;
+					maxLocation = location;
+				}
+				game.nextRound();
+			}
+			List<Location> ret = new ArrayList<>();
+			for (int i = 0; i < waits; i++) {
+				ret.add(null);
+			}
+			ret.add(maxLocation);
+			ret.add(null);
+			ret.add(null);
+			ret.add(null);
+			return ret;
+		}
+		
+		
+	}
+	
+	static class BombWithHighestDamage implements BombStrategy {
+		private final Map<Location, Integer> bombableLocations;
+
+		public BombWithHighestDamage(Game game) {
+			bombableLocations = game.getBombableLocations().stream()
+					.collect(Collectors.toMap(loc -> loc, loc -> game.newBombDamage(loc)));
+		}
+
+		@Override
+		public List<Location> getBombLocations() {
+			return Arrays.asList(bombableLocations.entrySet().stream()
+					.max((entry1, entry2) -> entry1.getValue() - entry2.getValue()).get().getKey(), null, null);
+		}
+		
+		Integer getBombValue(Location location) {
+			return bombableLocations.getOrDefault(location, 0);
 		}
 		
 	}
@@ -183,6 +281,10 @@ class Player {
 		Location location = keepMovingUntilMarginIsReached(map, direction, trajectory, second);
 		direction = Direction.reverse(direction);
 		location = keepMovingUntilMarginIsReached(map, direction, trajectory, location.moveTo(direction).moveTo(direction));
+		if (trajectory.get(trajectory.size() - 1).equals(first)) {
+			trajectory.remove(trajectory.size() - 1);
+			return trajectory;
+		}
 		direction = Direction.reverse(direction);
 		keepMovingUntilFirstIsReached(map, direction, trajectory, location.moveTo(direction).moveTo(direction), first);
 		return trajectory;
@@ -363,7 +465,7 @@ class Player {
 		
 		public int newBombDamage(Location location) {
 			return simulateRounds(BOMB_EXPIRATION).nodes.size() - 
-					simulateRounds(BOMB_EXPIRATION, location).nodes.size();
+					simulateBombAt(location).nodes.size();
 		}
 		
 		public Game simulateRounds(int rounds) {
@@ -372,6 +474,10 @@ class Player {
 		
 		public Game simulateRounds(int rounds, Location location) {
 			return simulateRounds(rounds, Optional.of(location));
+		}
+		
+		public Game simulateBombAt(Location location) {
+			return simulateRounds(BOMB_EXPIRATION, Optional.of(location));
 		}
 
 		private Game simulateRounds(int rounds, Optional<Location> bomb) {
@@ -384,12 +490,42 @@ class Player {
 			}
 			return simulated;
 		}
+
+		@Override
+		public String toString() {
+			StringBuilder sb = new StringBuilder();
+			Set<Location> allNodes = getNodeLocations();
+			Set<Location> bombs = bombsWithExpiration.keySet();
+			
+			for (int j = 0; j < height; j++) {
+				for (int i = 0; i < width; i++) {
+					Location location = new Location(i, j);
+					if (obstacles.contains(location)) {
+						sb.append('#');
+						continue;
+					}
+					if (bombs.contains(location)) {
+						sb.append(bombsWithExpiration.get(location));
+						continue;
+					}
+					if (allNodes.contains(location)) {
+						sb.append('@');
+						continue;
+					}
+					sb.append('.');
+				}
+				sb.append('\n');
+			}
+			return sb.toString();
+		}
+		
+		
 	}
 	
 	static class GameRound {
 		private final int rounds;
-		private final int bombs;
-		private final List<String> map;
+		final int bombs;
+		final List<String> map;
 		
 		GameRound(MyCustomScanner in, int height) {
 			rounds = in.nextInt();

@@ -7,13 +7,174 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class PlayerTest {
+	
+	
+	@Test
+	public void endOfFourNodesOneBomb() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"12",
+				"9",
+				"",
+				"55",
+				"1",
+				"",
+				"#..........#",
+				"............",
+				"....#..#....",
+				".@...@......",
+				"...#....#...",
+				"..........@.",
+				"....#..#....",
+				"......@.....",
+				"#..........#",
+				"54",
+				"1",
+				"",
+				"#..........#",
+				"............",
+				"....#@.#....",
+				"..@.........",
+				"...#....#...",
+				"...........@",
+				"....#..#....",
+				"............",
+				"#.....@....#");
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        Player.GameRound initialPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound round = new Player.GameRound(in, height);
+        Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
+        
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void fourNodesOneBomb() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"12",
+				"9",
+				"",
+				"55",
+				"1",
+				"",
+				"#..........#",
+				"............",
+				"....#.@#....",
+				"..@.........",
+				"...#....#...",
+				"...........@",
+				"....#..#....",
+				"............",
+				"#....@.....#",
+				"54",
+				"1",
+				"",
+				"#..........#",
+				"............",
+				"....#..#....",
+				"...@..@.....",
+				"...#....#...",
+				"..........@.",
+				"....#..#....",
+				".....@......",
+				"#..........#");
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        Player.GameRound initialPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound round = new Player.GameRound(in, height);
+        Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        System.out.println(nodes);
+        Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
+        
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void sixNodes() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"12",
+				"9",
+				"",
+				"50",
+				"7",
+				"",
+				"..@....@....",
+				"...........@",
+				".@..........",
+				".....@......",
+				"@...........",
+				"............",
+				"............",
+				".@..........",
+				"............",
+				"49",
+				"7",
+				"",
+				"..@........@",
+				".......@....",
+				"@...........",
+				"............",
+				".@...@......",
+				"............",
+				"............",
+				"..@.........",
+				"............");
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        Player.GameRound initialPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound round = new Player.GameRound(in, height);
+        Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        
+        Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
+        assertSolverHasReallySolved(game, solver);
+	}
+
+	protected void assertSolverHasReallySolved(Player.Game game, Player.GameSolverWithStrategyAndWait solver) {
+		Queue<Player.Location> bombsToBePlaced = new LinkedList<>();
+        if (solver.isSolved()) {
+        	System.err.println("Solved: "+solver.getBombLocations());
+        	bombsToBePlaced.addAll(solver.getBombLocations());
+        }
+        while (!bombsToBePlaced.isEmpty()) {
+        	Player.Location bomb = bombsToBePlaced.poll();
+        	if (bomb != null) {
+        		game.placeBombAt(bomb);
+        	}
+        	System.out.println(game);
+        	game.nextRound();
+        }
+        
+        assertThat(game.getNodeLocations()).isEmpty();
+	}
 	
 	@Test
 	public void oneNode() throws Exception {

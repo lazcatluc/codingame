@@ -1,4 +1,5 @@
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -317,6 +318,14 @@ public class PlayerTest {
 	}
 	
 	@Test
+	public void bombableLocationsExcludesCurrentBombs() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet(), 5, 5);
+		game.placeBombAt(new Player.Location(1, 1));
+		
+		assertThat(game.getBombableLocations()).doesNotContain(new Player.Location(1,1));
+	}
+	
+	@Test
 	public void simulatesGameFromCurrentGame() throws Exception {
 		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
 		Player.Game simulated = game.simulateRounds(2);
@@ -330,6 +339,26 @@ public class PlayerTest {
 		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
 		assertThat(game.newBombDamage(new Player.Location(1, 2))).isEqualTo(0);
 		assertThat(game.newBombDamage(new Player.Location(4, 2))).isEqualTo(1);
+	}
+	
+	@Test
+	public void bombWithHighestDamageDestroysEverything() throws Exception {
+		Set<Player.Location> locationsWithEmptyCenter = new HashSet<>(Arrays.asList(new Player.Location(0, 1), 
+				new Player.Location(1, 0), new Player.Location(1, 2), new Player.Location(2, 1)));
+		Set<Player.Node> nodes = Player.Node.getNodes(emptyMap(), locationsWithEmptyCenter, locationsWithEmptyCenter);
+		Player.Game game = new Player.Game(nodes, Collections.emptySet(), 12, 12);
+		
+		assertThat(new Player.BombWithHighestDamage(game).getBombLocations()).startsWith(new Player.Location(1, 1));
+	}
+	
+	@Test
+	public void retrievesBorderObstacles() throws Exception {
+		List<String> in = new ArrayList<>();
+		in.add("1");
+		in.add("1");
+		in.add("");
+		in.addAll(borderedMap());
+		assertThat(new Player.GameRound(new LinesScanner(in), 5).getObstacles()).contains(new Player.Location(0, 0));
 	}
 
 	protected Set<Player.Node> movingNode() {

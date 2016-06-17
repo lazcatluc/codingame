@@ -1,13 +1,15 @@
-import java.io.PrintStream;
+import java.	io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -29,17 +31,51 @@ class Player {
         GameRound initialPosition = new GameRound(in, height);
         out.println("WAIT");
         GameRound round = new GameRound(in, height);
+        Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        Game game = new Game(nodes, round.getObstacles(), width, height);
+        Queue<Location> bombsToBePlaced = new LinkedList<>();
+        
         // game loop
         while (true) {
-
+        	if (bombsToBePlaced.isEmpty()) {
+        		bombsToBePlaced.addAll(new BombWithHighestDamage(game).getBombLocations());
+        	}
+        	Location nextBomb = bombsToBePlaced.poll();
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
-            out.println("WAIT");
+        	if (nextBomb == null) {
+        		out.println("WAIT");
+        	}
+        	else {
+        		game.placeBombAt(nextBomb);
+        		out.println(nextBomb.x+" "+nextBomb.y);
+        	}
             if (round.rounds==1) {
             	return;
             }
             round = new GameRound(in, height);
+            game.nextRound();
         }
+	}
+	
+	interface BombStrategy {
+		List<Location> getBombLocations();
+	}
+	
+	static class BombWithHighestDamage implements BombStrategy {
+		private final Game game;
+		
+		public BombWithHighestDamage(Game game) {
+			this.game = game;
+		}
+
+		@Override
+		public List<Location> getBombLocations() {
+			return Arrays.asList(game.getBombableLocations().stream().collect(
+					Collectors.toMap(loc -> loc, loc -> game.newBombDamage(loc)))
+					.entrySet().stream().max((entry1, entry2) -> entry1.getValue() - entry2.getValue()).get().getKey(), null, null);
+		}
+		
 	}
 	
 	static class Location {
@@ -316,7 +352,8 @@ class Player {
 			for (int i = 0; i < width; i++) {
 				for (int j = 0; j < height ; j++) {
 					Location location = new Location(i, j);
-					if (!obstacles.contains(location) && !allNodesLocations.contains(location)) {
+					if (!obstacles.contains(location) && !allNodesLocations.contains(location) && 
+							!bombsWithExpiration.containsKey(location)) {
 						locations.add(location);
 					}
 				}
@@ -362,6 +399,26 @@ class Player {
 			for (int i = 0; i < height; i++) {
 				map.add(in.nextLine());
 			}
+		}
+		
+		private Set<Location> getLocationsOf(char c) {
+			Set<Location> locations = new HashSet<>();
+			for (int y = 0; y < map.size(); y++) {
+				for (int x = 0; x < map.get(y).length(); x++) {
+					if (map.get(y).charAt(x) == c) {
+						locations.add(new Location(x, y));
+					}
+				}
+			}
+			return locations;
+		}
+		
+		public Set<Location> getNodes() {
+			return getLocationsOf('@');
+		}
+		
+		public Set<Location> getObstacles() {
+			return getLocationsOf('#');
 		}
 	}
 	

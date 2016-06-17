@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -220,11 +221,24 @@ class Player {
 		private static final int BOMB_EXPIRATION = 3;
 		private static final int BOMB_POWER = 3;
 		private int round = 1;
+		private final int width;
+		private final int height;
 		private final Set<Node> nodes;
 		private final Set<Location> obstacles;
 		private Map<Location, Integer> bombsWithExpiration = new HashMap<>();
 		
-		public Game(Set<Node> nodes, Set<Location> obstacles) {
+		public Game(Game other) {
+			this.round = other.round;
+			this.height = other.height;
+			this.width = other.width;
+			this.nodes = new HashSet<>(other.nodes);
+			this.obstacles = new HashSet<>(other.obstacles);
+			this.bombsWithExpiration = new HashMap<>(other.bombsWithExpiration);
+		}
+		
+		public Game(Set<Node> nodes, Set<Location> obstacles, int width, int height) {
+			this.width = width;
+			this.height = height;
 			this.nodes = nodes;
 			this.obstacles = obstacles;
 		}
@@ -250,7 +264,15 @@ class Player {
 		private Set<Location> bombsToBeTriggered() {
 			Set<Location> expiredBombs = bombsWithExpiration.entrySet().stream()
 					.filter(entry -> entry.getValue().equals(1)).map(Map.Entry::getKey).collect(Collectors.toSet());
-			return expiredBombs;
+			Set<Location> enrichedBombs;
+			Set<Location> newEnrichedBombs = new HashSet<>(expiredBombs);
+			do {
+				enrichedBombs = new HashSet<>(newEnrichedBombs);
+				enrichedBombs.stream().map(this::getAccessibleLocationsFrom).flatMap(Set::stream)
+						.filter(bombsWithExpiration.keySet()::contains).forEach(newEnrichedBombs::add);
+			}
+			while (!enrichedBombs.equals(newEnrichedBombs));
+			return enrichedBombs;
 		}
 		
 		private void triggerBomb(Location location) {
@@ -286,6 +308,44 @@ class Player {
 
 		public void placeBombAt(Location location) {
 			bombsWithExpiration.put(location, BOMB_EXPIRATION);
+		}
+
+		public Set<Location> getBombableLocations() {
+			Set<Location> locations = new HashSet<>();
+			Set<Location> allNodesLocations = getNodeLocations();
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height ; j++) {
+					Location location = new Location(i, j);
+					if (!obstacles.contains(location) && !allNodesLocations.contains(location)) {
+						locations.add(location);
+					}
+				}
+			}
+			return locations;
+		}
+		
+		public int newBombDamage(Location location) {
+			return simulateRounds(BOMB_EXPIRATION).nodes.size() - 
+					simulateRounds(BOMB_EXPIRATION, location).nodes.size();
+		}
+		
+		public Game simulateRounds(int rounds) {
+			return simulateRounds(rounds, Optional.empty());
+		}
+		
+		public Game simulateRounds(int rounds, Location location) {
+			return simulateRounds(rounds, Optional.of(location));
+		}
+
+		private Game simulateRounds(int rounds, Optional<Location> bomb) {
+			Game simulated = new Game(this);
+			if (bomb.isPresent()) {
+				simulated.placeBombAt(bomb.get());
+			}
+			for (int i = 0; i < rounds; i++) {
+				simulated.nextRound();
+			}
+			return simulated;
 		}
 	}
 	

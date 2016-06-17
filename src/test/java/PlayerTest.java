@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class PlayerTest {
@@ -256,7 +257,7 @@ public class PlayerTest {
 	
 	@Test
 	public void computesNodesLocationsAtALaterRound() throws Exception {
-		Player.Game game = new Player.Game(nodesStartingFromOverlapping(), Collections.emptySet());
+		Player.Game game = new Player.Game(nodesStartingFromOverlapping(), Collections.emptySet(), 12, 12);
 		game.nextRound();
 		game.nextRound();
 		assertThat(game.getNodeLocations()).isEqualTo(
@@ -272,13 +273,68 @@ public class PlayerTest {
 	
 	@Test
 	public void addedBombBlowsAfterThreeRoundsDestroyingAdiacentNode() throws Exception {
-		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet());
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet(), 5, 5);
 		game.placeBombAt(new Player.Location(0,0));
 		game.nextRound();
 		game.nextRound();
+		
+		assertThat(game.getNodeLocations()).isNotEmpty();
 		game.nextRound();
 		
 		assertThat(game.getNodeLocations()).isEmpty();
+	}
+	
+	@Test
+	public void addedBombCanBeTriggeredEarlyByAPreviousBomb() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet(), 5, 5);
+		game.placeBombAt(new Player.Location(0,2));
+		game.nextRound();
+		game.placeBombAt(new Player.Location(0,0));
+		game.nextRound();
+		
+		assertThat(game.getNodeLocations()).isNotEmpty();
+		game.nextRound();
+		
+		assertThat(game.getNodeLocations()).isEmpty();
+	}
+	
+	@Test
+	public void bombableLocationsIncludes11() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet(), 5, 5);
+		assertThat(game.getBombableLocations()).contains(new Player.Location(1,1));
+	}
+	
+	@Test
+	public void bombableLocationsExcludesWalls() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.singleton(new Player.Location(0,0)), 5, 5);
+		assertThat(game.getBombableLocations()).doesNotContain(new Player.Location(0,0));
+	}
+	
+	@Test
+	public void bombableLocationsExcludesCurrentNodeLocations() throws Exception {
+		Player.Game game = new Player.Game(fixedNode(), Collections.emptySet(), 5, 5);
+		assertThat(game.getBombableLocations()).doesNotContain(new Player.Location(1, 0));
+	}
+	
+	@Test
+	public void simulatesGameFromCurrentGame() throws Exception {
+		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
+		Player.Game simulated = game.simulateRounds(2);
+		
+		assertThat(game.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(1, 0)));
+		assertThat(simulated.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(3, 0)));
+	}
+	
+	@Test
+	public void computesBombDamageInTheFuture() throws Exception {
+		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
+		assertThat(game.newBombDamage(new Player.Location(1, 2))).isEqualTo(0);
+		assertThat(game.newBombDamage(new Player.Location(4, 2))).isEqualTo(1);
+	}
+
+	protected Set<Player.Node> movingNode() {
+		return Player.Node.getNodes(emptyMap(), Collections.singleton(new Player.Location(0, 0)), 
+				Collections.singleton(new Player.Location(1, 0)));
 	}
 
 	private List<String> borderedMap() {
@@ -289,4 +345,5 @@ public class PlayerTest {
 							 "#####");
 	}
 }
+
 

@@ -284,9 +284,10 @@ class Player {
 			}
 		}
 		
-		public Location moveToIfOnTheMap(Direction direction, List<String> map) {
+		public Location moveToIfOnTheMapAndNotBlocked(Direction direction, List<String> map) {
+			
 			Location newLocation = moveTo(direction);
-			if (newLocation.isOnTheMap(map)) {
+			if (newLocation.isOnTheMapAndNotBlocked(map)) {
 				return newLocation;
 			}
 			newLocation = moveTo(Direction.reverse(direction));
@@ -455,16 +456,27 @@ class Player {
 			return "Node [trajectory=" + trajectory + "]";
 		}
 
+		@SafeVarargs
 		public static Set<Node> getNodes(List<String> map, Set<Location> locations1, Set<Location> locations2,
-				Set<Location> locations3) {
+				Set<Location>... subsequentLocations) {
 			Set<Node> ret = new HashSet<>();
 			locations1.forEach(location -> 
 				location.getNeighborsAndSelf().stream()
 						.filter(locations2::contains)
 						.forEach(neighbor -> {
-							if (locations3.contains(neighbor.moveToIfOnTheMap(location.directionTo(neighbor), map))) {
-								ret.add(new Node(map, location, neighbor));
+							Location previousNeighbor = location;
+							Location currentNeighbor = neighbor;
+							
+							for (int i = 0; i < subsequentLocations.length; i++) {
+								Direction currentDirection = previousNeighbor.directionTo(currentNeighbor);
+								Location nextNeighbor = currentNeighbor.moveToIfOnTheMapAndNotBlocked(currentDirection, map);
+								if (!subsequentLocations[i].contains(nextNeighbor)) {
+									return;
+								}
+								previousNeighbor = currentNeighbor;
+								currentNeighbor = nextNeighbor;
 							}
+							ret.add(new Node(map, location, neighbor));
 						})); 			
 			return ret;
 		}

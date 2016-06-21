@@ -17,6 +17,126 @@ import org.junit.Test;
 public class PlayerTest {
 	
 	@Test
+	public void vandalism() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"16",
+				"12",
+				"",
+				"98",
+				"10",
+				"",
+				"##..@...##@@@.@@",
+				"##.....#.##..@..",
+				"..#...#..#######",
+				"...#@#...##@...#",
+				"@..@.@..@#....#.",
+				"...#@#####...#..",
+				"..#...#...#@#...",
+				".#....#@..@.@..@",
+				"#...@.##..#@#...",
+				"#######@##...#..",
+				"......@.@#....##",
+				"@.........#@..#.",
+				"97",
+				"10",
+				"",
+				"##.@....##@@@.@@",
+				"##.....#.##.@...",
+				"..#...#..#######",
+				"...#@#..@##.@..#",
+				"...@.@...#....#.",
+				"@..#@#####...#..",
+				"..#...#@..#@#...",
+				".#....#...@.@...",
+				"#..@..##..#@#..@",
+				"#######@##...#..",
+				"......@.@#....##",
+				".@........#.@.#.",
+				"96",
+				"10",
+				"",
+				"##@.....##@@@.@@",
+				"##.....#.##@....",
+				"..#...#.@#######",
+				"...#@#...##..@.#",
+				"...@.@...#....#.",
+				"...#@#####...#..",
+				"@.#...#...#@#...",
+				".#....#@..@.@...",
+				"#.@...##..#@#...",
+				"#######@##...#.@",
+				"......@.@#....##",
+				"..@.......#..@#.",
+				"95",
+				"10",
+				"",
+				"##.@....##@@@.@@",
+				"##.....#@##.@...",
+				"..#...#..#######",
+				"...#@#...##...@#",
+				"...@.@...#....#.",
+				"...#@#####...#..",
+				"..#...#@..#@#...",
+				"@#....#...@.@...",
+				"#@....##..#@#..@",
+				"#######@##...#..",
+				"......@.@#....##",
+				"...@......#.@.#.",
+				"94",
+				"10",
+				"",
+				"##..@...##@@@.@@",
+				"##.....#.##..@..",
+				"..#...#.@#######",
+				"...#@#...##..@.#",
+				"...@.@...#....#.",
+				"...#@#####...#..",
+				"@.#...#...#@#...",
+				".#....#@..@.@..@",
+				"#.@...##..#@#...",
+				"#######@##...#..",
+				"......@.@#....##",
+				"....@.....#@..#.",
+				"93",
+				"10",
+				"",
+				"##...@..##@@@.@@",
+				"##.....#.##...@.",
+				"..#...#..#######",
+				"...#@#..@##.@..#",
+				"...@.@...#....#.",
+				"@..#@#####...#..",
+				"..#...#@..#@#..@",
+				".#....#...@.@...",
+				"#..@..##..#@#...",
+				"#######@##...#..",
+				"......@.@#....##",
+				".....@....#.@.#.");
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        int initialWaits = 5;
+        Player.GameRound[] positions = new Player.GameRound[initialWaits + 1];
+        for (int i = 0; i <= initialWaits; i++) {
+            positions[i] = new Player.GameRound(in, height);
+        }
+        Player.GameRound round = positions[initialWaits];
+        System.err.println(in);
+        @SuppressWarnings("unchecked")
+		Set<Player.Location>[] subsequentNodes = new Set[initialWaits - 1];
+        for (int i = 2; i <= initialWaits; i++) {
+        	subsequentNodes[i - 2] = positions[i].getNodes(); 
+        }
+        Set<Player.Node> nodes = Player.Node.getNodes(round.map, positions[0].getNodes(), positions[1].getNodes(), subsequentNodes);
+
+        
+        assertThat(nodes.size()).isEqualTo(26);
+	}
+	
+	@Test
 	public void patience() throws Exception {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		List<String> input = Arrays.asList(

@@ -30,8 +30,10 @@ class Player {
         in.nextLine();
         GameRound initialPosition = new GameRound(in, height);
         out.println("WAIT");
+        GameRound secondPosition = new GameRound(in, height);
+        out.println("WAIT");
         GameRound round = new GameRound(in, height);
-        Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), secondPosition.getNodes(), round.getNodes());
         Game game = new Game(nodes, round.getObstacles(), width, height);
         Queue<Location> bombsToBePlaced = new LinkedList<>();
         GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game, round.bombs);
@@ -186,6 +188,9 @@ class Player {
 		}
 
 		public Location moveTo(Direction direction) {
+			if (direction == null) {
+				return this;
+			}
 			switch (direction) {
 			case UP:
 				return new Location(x, y - 1);
@@ -198,6 +203,25 @@ class Player {
 			default:
 				throw new IllegalArgumentException(direction.toString());
 			}
+		}
+		
+		public Location moveToIfOnTheMap(Direction direction, List<String> map) {
+			Location newLocation = moveTo(direction);
+			if (newLocation.isOnTheMap(map)) {
+				return newLocation;
+			}
+			newLocation = moveTo(Direction.reverse(direction));
+			if (newLocation.isOnTheMap(map)) {
+				return newLocation;
+			}
+			return null;
+		}
+		
+		public Direction directionTo(Location neighbor) {
+			if (this.equals(neighbor)) {
+				return null;
+			}
+			return Arrays.stream(Direction.values()).filter(direction -> moveTo(direction).equals(neighbor)).findAny().get();
 		}
 
 		public boolean isOnTheMapAndNotBlocked(List<String> map) {
@@ -351,6 +375,20 @@ class Player {
 		public String toString() {
 			return "Node [trajectory=" + trajectory + "]";
 		}
+
+		public static Set<Node> getNodes(List<String> map, Set<Location> locations1, Set<Location> locations2,
+				Set<Location> locations3) {
+			Set<Node> ret = new HashSet<>();
+			locations1.forEach(location -> 
+				location.getNeighborsAndSelf().stream()
+						.filter(locations2::contains)
+						.forEach(neighbor -> {
+							if (locations3.contains(neighbor.moveToIfOnTheMap(location.directionTo(neighbor), map))) {
+								ret.add(new Node(map, location, neighbor));
+							}
+						})); 			
+			return ret;
+		}
 		
 		
 	}
@@ -358,7 +396,7 @@ class Player {
 	static class Game {
 		private static final int BOMB_EXPIRATION = 3;
 		private static final int BOMB_POWER = 3;
-		private int round = 1;
+		private int round = 2;
 		private final int width;
 		private final int height;
 		private final Set<Node> nodes;
@@ -603,6 +641,9 @@ class Player {
 		UP, DOWN, LEFT, RIGHT;
 
 		public static Direction reverse(Direction direction) {
+			if (direction == null) {
+				return null;
+			}
 			switch (direction) {
 			case LEFT: return RIGHT;
 			case RIGHT: return LEFT;

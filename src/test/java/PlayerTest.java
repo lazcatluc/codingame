@@ -16,6 +16,66 @@ import org.junit.Test;
 
 public class PlayerTest {
 	
+	@Test
+	public void fourNodes() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"12",
+				"9",
+				"",
+				"60",
+				"4",
+				"",
+				"........@...",
+				".......@....",
+				".#.#.#@#.#.#",
+				".....@......",
+				"#.#.@#..#.#.",
+				"...@........",
+				"..@.........",
+				".@..........",
+				"@...........",
+				"59",
+				"4",
+				"",
+				".......@....",
+				"........@...",
+				".#.#.#.#.#.#",
+				"....@.@.....",
+				"#.#..#..#.#.",
+				"..@.........",
+				"...@........",
+				"............",
+				".@..........",
+				"58",
+				"4",
+				"",
+				"......@.....",
+				".........@..",
+				".#.#@#.#.#.#",
+				".......@....",
+				"#.#..#@.#.#.",
+				".@..........",
+				"....@.......",
+				".@..........",
+				"..@.........");
+		
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        Player.GameRound initialPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound secondPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound thirdPosition = new Player.GameRound(in, height);
+        Set<Player.Node> nodes = Player.Node.getNodes(secondPosition.map, initialPosition.getNodes(), 
+        		secondPosition.getNodes(), thirdPosition.getNodes());
+        
+        assertThat(nodes.size()).isEqualTo(9);
+	}
+	
 	
 	@Test
 	public void endOfFourNodesOneBomb() throws Exception {
@@ -47,7 +107,19 @@ public class PlayerTest {
 				"...........@",
 				"....#..#....",
 				"............",
-				"#.....@....#");
+				"#.....@....#",
+				"53",
+				"1",
+				"",
+				"#..........#",
+				".....@......",
+				"....#..#....",
+				"...@........",
+				"...#....#...",
+				"..........@.",
+				"....#..#....",
+				"......@.....",
+				"#..........#");
 		LinesScanner in = new LinesScanner(input);
 		PrintStream out = new PrintStream(baos);
 		int width = in.nextInt(); // width of the firewall grid
@@ -55,8 +127,11 @@ public class PlayerTest {
         in.nextLine();
         Player.GameRound initialPosition = new Player.GameRound(in, height);
         out.println("WAIT");
+        Player.GameRound secondPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
         Player.GameRound round = new Player.GameRound(in, height);
-        Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        Set<Player.Node> nodes = Player.Node.getNodes(secondPosition.map, initialPosition.getNodes(), 
+        		secondPosition.getNodes(), round.getNodes());
         Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
         
         Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
@@ -142,6 +217,18 @@ public class PlayerTest {
 				"............",
 				"............",
 				"..@.........",
+				"............",
+				"48",
+				"6",
+				"",
+				"..@.........",
+				"...........@",
+				".@.....@....",
+				"............",
+				"..@.........",
+				".....@......",
+				"............",
+				"...@........",
 				"............");
 		LinesScanner in = new LinesScanner(input);
 		PrintStream out = new PrintStream(baos);
@@ -150,8 +237,11 @@ public class PlayerTest {
         in.nextLine();
         Player.GameRound initialPosition = new Player.GameRound(in, height);
         out.println("WAIT");
+        Player.GameRound secondPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
         Player.GameRound round = new Player.GameRound(in, height);
-        Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
+        Set<Player.Node> nodes = Player.Node.getNodes(secondPosition.map, initialPosition.getNodes(), 
+        		secondPosition.getNodes(), round.getNodes());
         
         Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
         Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
@@ -160,10 +250,8 @@ public class PlayerTest {
 
 	protected void assertSolverHasReallySolved(Player.Game game, Player.GameSolverWithStrategyAndWait solver) {
 		Queue<Player.Location> bombsToBePlaced = new LinkedList<>();
-        if (solver.isSolved()) {
-        	System.err.println("Solved: "+solver.getBombLocations());
-        	bombsToBePlaced.addAll(solver.getBombLocations());
-        }
+		assertThat(solver.isSolved());    
+    	bombsToBePlaced.addAll(solver.getBombLocations());
         while (!bombsToBePlaced.isEmpty()) {
         	Player.Location bomb = bombsToBePlaced.poll();
         	if (bomb != null) {
@@ -421,7 +509,6 @@ public class PlayerTest {
 	public void computesNodesLocationsAtALaterRound() throws Exception {
 		Player.Game game = new Player.Game(nodesStartingFromOverlapping(), Collections.emptySet(), 12, 12);
 		game.nextRound();
-		game.nextRound();
 		assertThat(game.getNodeLocations()).isEqualTo(
 				new HashSet<>(Arrays.asList(new Player.Location(3, 0), new Player.Location(0, 3))));
 	}
@@ -491,15 +578,15 @@ public class PlayerTest {
 		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
 		Player.Game simulated = game.simulateRounds(2);
 		
-		assertThat(game.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(1, 0)));
-		assertThat(simulated.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(3, 0)));
+		assertThat(game.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(2, 0)));
+		assertThat(simulated.getNodeLocations()).isEqualTo(Collections.singleton(new Player.Location(4, 0)));
 	}
 	
 	@Test
 	public void computesBombDamageInTheFuture() throws Exception {
 		Player.Game game = new Player.Game(movingNode(), Collections.emptySet(), 12, 12);
 		assertThat(game.newBombDamage(new Player.Location(1, 2))).isEqualTo(0);
-		assertThat(game.newBombDamage(new Player.Location(4, 2))).isEqualTo(1);
+		assertThat(game.newBombDamage(new Player.Location(5, 2))).isEqualTo(1);
 	}
 	
 	@Test

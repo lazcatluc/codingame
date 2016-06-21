@@ -17,7 +17,89 @@ import org.junit.Test;
 public class PlayerTest {
 	
 	@Test
-	public void fourNodes() throws Exception {
+	public void patience() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		List<String> input = Arrays.asList(
+				"12",
+				"9",
+				"",
+				"90",
+				"3",
+				"",
+				"@...........",
+				".....@....@.",
+				"@...........",
+				".....@......",
+				"..@.@.@.@...",
+				".....@......",
+				"............",
+				".@...@......",
+				".........@.@",
+				"89",
+				"3",
+				"",
+				".@..........",
+				".....@....@.",
+				"............",
+				"@....@......",
+				"..@.@.@.@...",
+				".....@......",
+				"............",
+				".@...@.....@",
+				"........@...",
+				"88",
+				"3",
+				"",
+				"..@.........",
+				".....@....@.",
+				"............",
+				".....@......",
+				"@.@.@.@.@...",
+				".....@......",
+				"...........@",
+				".@...@......",
+				".......@....");
+		LinesScanner in = new LinesScanner(input);
+		PrintStream out = new PrintStream(baos);
+		int width = in.nextInt(); // width of the firewall grid
+        int height = in.nextInt(); // height of the firewall grid
+        in.nextLine();
+        Player.GameRound initialPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound secondPosition = new Player.GameRound(in, height);
+        out.println("WAIT");
+        Player.GameRound thirdPosition = new Player.GameRound(in, height);
+        Set<Player.Node> nodes = Player.Node.getNodes(thirdPosition.map, initialPosition.getNodes(), 
+        		secondPosition.getNodes(), thirdPosition.getNodes());
+        
+        assertThat(nodes.size()).isEqualTo(14);
+        Player.Game game = new Player.Game(nodes, thirdPosition.getObstacles(), width, height, 4);
+        
+        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
+        		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 3);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void fourBombs() throws Exception {
+		Player.Game game = initFourBombs();
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, 4);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void fourBombsWithGreedy() throws Exception {
+		Player.Game game = initFourBombs();
+        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
+        		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 4);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+
+
+	protected Player.Game initFourBombs() {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		List<String> input = Arrays.asList(
 				"12",
@@ -70,15 +152,34 @@ public class PlayerTest {
         Player.GameRound secondPosition = new Player.GameRound(in, height);
         out.println("WAIT");
         Player.GameRound thirdPosition = new Player.GameRound(in, height);
-        Set<Player.Node> nodes = Player.Node.getNodes(secondPosition.map, initialPosition.getNodes(), 
+        Set<Player.Node> nodes = Player.Node.getNodes(thirdPosition.map, initialPosition.getNodes(), 
         		secondPosition.getNodes(), thirdPosition.getNodes());
         
         assertThat(nodes.size()).isEqualTo(9);
+        Player.Game game = new Player.Game(nodes, thirdPosition.getObstacles(), width, height);
+		return game;
 	}
 	
 	
 	@Test
 	public void endOfFourNodesOneBomb() throws Exception {
+		Player.Game game = initEndOfFourNodes();
+        
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, 1);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void endOfFourNodesOneBombGreedy() throws Exception {
+		Player.Game game = initEndOfFourNodes();
+        
+        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 1);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+
+	protected Player.Game initEndOfFourNodes() {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		List<String> input = Arrays.asList(
 				"12",
@@ -133,14 +234,29 @@ public class PlayerTest {
         Set<Player.Node> nodes = Player.Node.getNodes(secondPosition.map, initialPosition.getNodes(), 
         		secondPosition.getNodes(), round.getNodes());
         Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
+		return game;
+	}
+	
+	@Test
+	public void fourNodesOneBomb() throws Exception {
+		Player.Game game = initFourNodesOneBomb();
         
-        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
+        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, 1);
         
         assertSolverHasReallySolved(game, solver);
 	}
 	
 	@Test
-	public void fourNodesOneBomb() throws Exception {
+	public void fourNodesOneBombGreedy() throws Exception {
+		Player.Game game = initFourNodesOneBomb();
+        
+        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
+        		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 1);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+
+	protected Player.Game initFourNodesOneBomb() {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		List<String> input = Arrays.asList(
 				"12",
@@ -181,10 +297,7 @@ public class PlayerTest {
         Set<Player.Node> nodes = Player.Node.getNodes(round.map, initialPosition.getNodes(), round.getNodes());
         System.out.println(nodes);
         Player.Game game = new Player.Game(nodes, round.getObstacles(), width, height);
-        
-        Player.GameSolverWithStrategyAndWait solver = new Player.GameSolverWithStrategyAndWait(game, round.bombs);
-        
-        assertSolverHasReallySolved(game, solver);
+		return game;
 	}
 	
 	@Test
@@ -248,16 +361,16 @@ public class PlayerTest {
         assertSolverHasReallySolved(game, solver);
 	}
 
-	protected void assertSolverHasReallySolved(Player.Game game, Player.GameSolverWithStrategyAndWait solver) {
+	protected void assertSolverHasReallySolved(Player.Game game, Player.BombStrategy solver) {
 		Queue<Player.Location> bombsToBePlaced = new LinkedList<>();
-		assertThat(solver.isSolved());    
+		assertThat(solver.isSolved()).isTrue();    
     	bombsToBePlaced.addAll(solver.getBombLocations());
         while (!bombsToBePlaced.isEmpty()) {
         	Player.Location bomb = bombsToBePlaced.poll();
         	if (bomb != null) {
         		game.placeBombAt(bomb);
         	}
-        	System.out.println(game);
+        	//System.out.println(game);
         	game.nextRound();
         }
         

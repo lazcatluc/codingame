@@ -20,31 +20,44 @@ import java.util.stream.Collectors;
  **/
 class Player {
 	
-	public static void main(String args[]) {
+	public static void main(String args[]) throws InterruptedException {
 		run(new MyScanner(new Scanner(System.in)), System.out);
     }
 
-	protected static void run(MyCustomScanner in, PrintStream out) {
+	protected static void run(MyCustomScanner in, PrintStream out) throws InterruptedException {
+		int initialWaits = 5;
+		Thread t = new Thread(() -> {
+        	try {
+        		for (int i = 0; i < initialWaits; i++) {
+        			Thread.sleep(95);	
+        			out.println("WAIT");
+        		}
+			} catch (InterruptedException e) {
+				return;
+			}
+        });
+		t.start();
 		int width = in.nextInt(); // width of the firewall grid
         int height = in.nextInt(); // height of the firewall grid
         in.nextLine();
         GameRound initialPosition = new GameRound(in, height);
-        out.println("WAIT");
         GameRound secondPosition = new GameRound(in, height);
-        out.println("WAIT");
         GameRound round = new GameRound(in, height);
         Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), secondPosition.getNodes(), round.getNodes());
-        Game game = new Game(nodes, round.getObstacles(), width, height);
+        Game game = new Game(nodes, round.getObstacles(), width, height, initialWaits);
         Queue<Location> bombsToBePlaced = new LinkedList<>();
-        GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game, round.bombs);
+        GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
+        		new GreedyStrategyWaitingForSignificantFractionOfNodes(game, round.bombs);
+        
         if (solver.isSolved()) {
+        	t.join();
         	System.err.println("Solved: "+solver.getBombLocations());
         	bombsToBePlaced.addAll(solver.getBombLocations());
         }
         // game loop
         while (true) {
         	if (bombsToBePlaced.isEmpty()) {
-        		bombsToBePlaced.addAll(new BombWithHighestDamageAndPatience(game, 10).getBombLocations());
+        		bombsToBePlaced.addAll(new BombWithHighestDamageAndPatience(game, 50).getBombLocations());
         	}
         	Location nextBomb = bombsToBePlaced.poll();
             // Write an action using System.out.println()
@@ -66,26 +79,21 @@ class Player {
 	
 	interface BombStrategy {
 		List<Location> getBombLocations();
+		boolean isSolved();
 	}
 	
-	static class GameSolverWithStrategyAndWait implements BombStrategy {
+	static class GreedyStrategyWaitingForSignificantFractionOfNodes implements BombStrategy {
 		private final Game game;
 		private final int availableBombs;
+		private final int maxWaits;
 		private final boolean solved;
 		private final List<Location> bombLocations = new ArrayList<>();
-
-		public GameSolverWithStrategyAndWait(Game game, int availableBombs) {
+		
+		public GreedyStrategyWaitingForSignificantFractionOfNodes(Game game, int availableBombs) {
+			this.maxWaits = availableBombs == 1 ? 50 : 10;
 			this.game = new Game(game);
 			this.availableBombs = availableBombs;
-			boolean solved = trySolve();
-			if (!solved && availableBombs == 1) {
-				for (int i = 0; i < 50 && !solved; i++) {
-					bombLocations.add(null);
-					this.game.nextRound();
-					solved = trySolve(); 
-				}
-			}
-			this.solved = solved;
+			this.solved = trySolve();
 		}
 
 		private boolean trySolve() {
@@ -95,13 +103,75 @@ class Player {
 			if (availableBombs == 0) {
 				return false;
 			}
-			Location bombLocation = new BombWithHighestDamage(game).getBombLocations().get(0);
-			GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game.simulateBombAt(bombLocation),
-					availableBombs - 1);
-			if (solver.solved) {
-				bombLocations.addAll(Arrays.asList(bombLocation, null, null));
-				bombLocations.addAll(solver.getBombLocations());
+			List<Location> bombLocations = new BombWithHighestDamageAndPatience(game, maxWaits).getBombLocations();
+			Iterator<Location> bombIt = bombLocations.iterator();
+			while (bombIt.hasNext()) {
+				Location bombLocation = bombIt.next();
+				if (bombLocation == null) {
+					game.nextRound();
+					continue;
+				}
+				int totalNodes = game.nodes.size();
+				Game simulateBombAt = game.simulateBombAt(bombLocation);
+				int destroyedNodes = totalNodes - simulateBombAt.nodes.size();
+				if (totalNodes <= destroyedNodes * availableBombs) {
+					GreedyStrategyWaitingForSignificantFractionOfNodes solver = new GreedyStrategyWaitingForSignificantFractionOfNodes(
+							simulateBombAt, availableBombs - 1);
+					this.bombLocations.addAll(bombLocations);
+					this.bombLocations.addAll(solver.getBombLocations());
+					return solver.isSolved();
+				}
+				return false;
+			}
+			
+			return false;
+		}
+		
+		public boolean isSolved() {
+			return solved;
+		}
+
+		@Override
+		public List<Location> getBombLocations() {
+			return Collections.unmodifiableList(bombLocations);
+		}
+		
+	}
+	
+	static class GameSolverWithStrategyAndWait implements BombStrategy {
+		private final Game game;
+		private final int availableBombs;
+		private final int maxWaits;
+		private final boolean solved;
+		private final List<Location> bombLocations = new ArrayList<>();
+
+		public GameSolverWithStrategyAndWait(Game game, int availableBombs) {
+			this.maxWaits = availableBombs == 1 ? 50 : 5;
+			this.game = new Game(game);
+			this.availableBombs = availableBombs;
+			this.solved = trySolve();
+		}
+		
+		private boolean trySolve() {
+			if (game.nodes.isEmpty()) {
 				return true;
+			}
+			if (availableBombs == 0) {
+				return false;
+			}
+			for (int i = 0; i < maxWaits; i++) {
+				Location bombLocation = new BombWithHighestDamage(game).getBombLocations().get(0);
+				GameSolverWithStrategyAndWait solver = new GameSolverWithStrategyAndWait(game.simulateBombAt(bombLocation),
+						availableBombs - 1);
+				if (solver.solved) {
+					bombLocations.addAll(Arrays.asList(bombLocation, null, null));
+					bombLocations.addAll(solver.getBombLocations());
+					return true;
+				}
+				if (i < maxWaits - 1) {
+					game.nextRound();
+					bombLocations.add(null);
+				}
 			}
 			return false;
 		}
@@ -151,8 +221,12 @@ class Player {
 			ret.add(maxLocation);
 			ret.add(null);
 			ret.add(null);
-			ret.add(null);
 			return ret;
+		}
+
+		@Override
+		public boolean isSolved() {
+			return false;
 		}
 		
 		
@@ -174,6 +248,11 @@ class Player {
 		
 		Integer getBombValue(Location location) {
 			return bombableLocations.getOrDefault(location, 0);
+		}
+
+		@Override
+		public boolean isSolved() {
+			return false;
 		}
 		
 	}
@@ -396,7 +475,7 @@ class Player {
 	static class Game {
 		private static final int BOMB_EXPIRATION = 3;
 		private static final int BOMB_POWER = 3;
-		private int round = 2;
+		private int round;
 		private final int width;
 		private final int height;
 		private final Set<Node> nodes;
@@ -413,10 +492,14 @@ class Player {
 		}
 		
 		public Game(Set<Node> nodes, Set<Location> obstacles, int width, int height) {
+			this(nodes, obstacles, width, height, 2);
+		}
+		public Game(Set<Node> nodes, Set<Location> obstacles, int width, int height, int round) {
 			this.width = width;
 			this.height = height;
 			this.nodes = nodes;
 			this.obstacles = obstacles;
+			this.round = round;
 		}
 		
 		private Location getNodeLocation(Node node) {

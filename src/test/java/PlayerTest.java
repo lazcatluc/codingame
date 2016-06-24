@@ -1,5 +1,4 @@
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class PlayerTest {
@@ -132,12 +132,35 @@ public class PlayerTest {
         }
         Set<Player.Node> nodes = Player.Node.getNodes(round.map, positions[0].getNodes(), positions[1].getNodes(), subsequentNodes);
 
-        
         assertThat(nodes.size()).isEqualTo(26);
+        Player.Game game = new Player.Game(nodes, positions[0].getObstacles(), width, height, 10);
+        Player.SubsetCoverage solver = new Player.SubsetCoverage(game, 90, 10);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	
+
+	@Test
+	public void patience() throws Exception {
+		Player.Game game = initPatience();
+        
+        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
+        		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 3);
+        
+        assertSolverHasReallySolved(game, solver);
 	}
 	
 	@Test
-	public void patience() throws Exception {
+	public void patienceSubsetCoverage() throws Exception {
+		Player.Game game = initPatience();
+        
+		Player.SubsetCoverage solver = new Player.SubsetCoverage(game, 90, 3);
+        
+		assertSolverHasReallySolved(game, solver);
+	}
+
+	protected Player.Game initPatience() {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		List<String> input = Arrays.asList(
 				"12",
@@ -194,11 +217,7 @@ public class PlayerTest {
         
         assertThat(nodes.size()).isEqualTo(14);
         Player.Game game = new Player.Game(nodes, thirdPosition.getObstacles(), width, height, 4);
-        
-        Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
-        		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 3);
-        
-        assertSolverHasReallySolved(game, solver);
+		return game;
 	}
 	
 	@Test
@@ -214,6 +233,15 @@ public class PlayerTest {
 		Player.Game game = initFourBombs();
         Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
         		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 4);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	@Ignore
+	public void fourBombsSetCoverage() throws Exception {
+		Player.Game game = initFourBombs();
+        Player.SubsetCoverage solver = new Player.SubsetCoverage(game, 60, 4);
         
         assertSolverHasReallySolved(game, solver);
 	}
@@ -372,6 +400,16 @@ public class PlayerTest {
         
         Player.GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
         		new Player.GreedyStrategyWaitingForSignificantFractionOfNodes(game, 1);
+        
+        assertSolverHasReallySolved(game, solver);
+	}
+	
+	@Test
+	public void fourNodesOneBombSetCoverage() throws Exception {
+		Player.Game game = initFourNodesOneBomb();
+        
+        Player.SubsetCoverage solver = 
+        		new Player.SubsetCoverage(game, 55, 1);
         
         assertSolverHasReallySolved(game, solver);
 	}

@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,8 +47,10 @@ class Player {
         Set<Node> nodes = Node.getNodes(round.map, initialPosition.getNodes(), secondPosition.getNodes(), round.getNodes());
         Game game = new Game(nodes, round.getObstacles(), width, height, initialWaits);
         Queue<Location> bombsToBePlaced = new LinkedList<>();
-        GreedyStrategyWaitingForSignificantFractionOfNodes solver = 
-        		new GreedyStrategyWaitingForSignificantFractionOfNodes(game, round.bombs);
+        BombStrategy solver = new SubsetCoverage(game, initialPosition.rounds, round.bombs);
+        if (!solver.isSolved()) {
+        	solver = new GreedyStrategyWaitingForSignificantFractionOfNodes(game, round.bombs);
+        }
         
         if (solver.isSolved()) {
         	t.join();
@@ -413,9 +416,16 @@ class Player {
 	
 	static class Node {
 		private final List<Location> trajectory;
+		private final List<Location> firstTwoLocations;
 
 		public Node(List<String> map, Location first, Location second) {
 			this.trajectory = buildTrajectory(map, first, second);
+			if (trajectory.size() == 1) {
+				this.firstTwoLocations = Arrays.asList(trajectory.get(0), trajectory.get(0));
+			}
+			else {
+				this.firstTwoLocations = trajectory.subList(0, 2);
+			}
 		}
 		
 		public static Set<Node> getNodes(List<String> map, Set<Location> firstLocations, Set<Location> secondLocations) {
@@ -430,7 +440,7 @@ class Player {
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((trajectory == null) ? 0 : trajectory.hashCode());
+			result = prime * result + ((firstTwoLocations == null) ? 0 : firstTwoLocations.hashCode());
 			return result;
 		}
 
@@ -443,17 +453,17 @@ class Player {
 			if (getClass() != obj.getClass())
 				return false;
 			Node other = (Node) obj;
-			if (trajectory == null) {
-				if (other.trajectory != null)
+			if (firstTwoLocations == null) {
+				if (other.firstTwoLocations != null)
 					return false;
-			} else if (!trajectory.equals(other.trajectory))
+			} else if (!firstTwoLocations.equals(other.firstTwoLocations))
 				return false;
 			return true;
 		}
 
 		@Override
 		public String toString() {
-			return "Node [trajectory=" + trajectory + "]";
+			return "Node [firstTwoLocations=" + firstTwoLocations + "]";
 		}
 
 		@SafeVarargs
@@ -515,7 +525,7 @@ class Player {
 		}
 		
 		private Location getNodeLocation(Node node) {
-			return node.trajectory.get(round % node.trajectory.size());
+			return getNodeLocation(node, 0);
 		}
 
 		public void nextRound() {
@@ -574,7 +584,7 @@ class Player {
 		}
 
 		public Set<Location> getNodeLocations() {
-			return nodes.stream().map(this::getNodeLocation).collect(Collectors.toSet());
+			return getNodeLocations(0);
 		}
 
 		public void placeBombAt(Location location) {
@@ -596,6 +606,48 @@ class Player {
 			return locations;
 		}
 		
+		public Map<Location, Set<Node>> getBombableLocationsWithDamage() {
+			Map<Location, Set<Node>> locations = new HashMap<>();
+			Set<Location> allNodesLocations = getNodeLocations();
+			Set<Location> allNodesLocationsWhenBombBlows = getNodeLocations(BOMB_EXPIRATION);
+			for (int i = 0; i < width; i++) {
+				locationFor:
+				for (int j = 0; j < height ; j++) {
+					Location location = new Location(i, j);
+					if (!obstacles.contains(location) && !allNodesLocations.contains(location) && 
+							!bombsWithExpiration.containsKey(location)) {
+						Set<Node> damage = nodesAtLocation(getAccessibleLocationsFrom(location).stream()
+								.filter(allNodesLocationsWhenBombBlows::contains).collect(Collectors.toSet()), BOMB_EXPIRATION);
+						Iterator<Map.Entry<Location, Set<Node>>> currentLocationsWithDamage = locations.entrySet().iterator();
+						while (currentLocationsWithDamage.hasNext()) {
+							Map.Entry<Location, Set<Node>> entry = currentLocationsWithDamage.next();
+							if (entry.getValue().containsAll(damage)) {
+								continue locationFor;
+							}
+							if (damage.containsAll(entry.getValue())) {
+								currentLocationsWithDamage.remove();
+							}
+						}
+						locations.put(location, damage);
+					}
+				}
+			}
+			return locations;
+		}
+		
+		private Set<Node> nodesAtLocation(Set<Location> loc, int bombExpiration) {
+			return nodes.stream().filter(node -> loc.contains(node.trajectory.get((round + bombExpiration) % node.trajectory.size())))
+					.collect(Collectors.toSet());
+		}
+
+		private Set<Location> getNodeLocations(int bombExpiration) {
+			return nodes.stream().map(node -> getNodeLocation(node, bombExpiration)).collect(Collectors.toSet());
+		}
+
+		private Location getNodeLocation(Node node, int bombExpiration) {
+			return node.trajectory.get((round + bombExpiration) % node.trajectory.size());
+		}
+
 		public int newBombDamage(Location location) {
 			return simulateRounds(BOMB_EXPIRATION).nodes.size() - 
 					simulateBombAt(location).nodes.size();
@@ -651,7 +703,279 @@ class Player {
 			}
 			return sb.toString();
 		}
+
+		public Set<Node> getNodes() {
+			return Collections.unmodifiableSet(nodes);
+		}
 		
+		
+	}
+	
+	static class MaximalBombLocationDamage implements Comparable<MaximalBombLocationDamage> {
+		private final Location bombLocation;
+		private final Map<Node, Integer> killedNodesScores;
+		private final Set<Integer> killerRounds;
+		private Integer[] sortedScores;
+		
+		public MaximalBombLocationDamage(MaximalBombLocationDamage other) {
+			this.bombLocation = other.bombLocation;
+			this.killedNodesScores = new HashMap<>(other.killedNodesScores);
+			this.killerRounds = new HashSet<>(other.killerRounds);
+		}
+		
+		public MaximalBombLocationDamage(Location bombLocation, Set<Integer> killerRounds) {
+			this.bombLocation = bombLocation;
+			this.killedNodesScores = new HashMap<>();
+			this.killerRounds = new HashSet<>(killerRounds);
+		}
+		
+		public MaximalBombLocationDamage(Location bombLocation) {
+			this.bombLocation = bombLocation;
+			this.killedNodesScores = new HashMap<>();
+			this.killerRounds = new HashSet<>();
+		}
+		
+		public List<Integer> getKillerRounds() {
+			return new ArrayList<>(killerRounds);
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((bombLocation == null) ? 0 : bombLocation.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			MaximalBombLocationDamage other = (MaximalBombLocationDamage) obj;
+			if (bombLocation == null) {
+				if (other.bombLocation != null)
+					return false;
+			} else if (!bombLocation.equals(other.bombLocation))
+				return false;
+			return true;
+		}
+		
+		public void addKilledNode(Node node, Integer score) {
+			killedNodesScores.put(node, score);
+			sortedScores = null;
+		}
+
+		public void removeAll(Set<Node> nodes) {
+			killedNodesScores.keySet().removeAll(nodes);
+			sortedScores = null;
+		}
+		
+		public void removeAll(MaximalBombLocationDamage o) {
+			removeAll(o.killedNodesScores.keySet());
+		}
+		
+		public void retainAll(Set<Integer> rounds) {
+			killerRounds.retainAll(rounds);
+		}
+
+		@Override
+		public String toString() {
+			return "MaximalBombLocationDamage [bombLocation=" + bombLocation + ", killedNodes=" + killedNodesScores
+					+ ", killerRounds=" + killerRounds + "]";
+		}
+		
+		private Integer[] getScore() {
+			if (sortedScores == null) {
+				sortedScores = killedNodesScores.values().toArray(new Integer[killedNodesScores.values().size()]);
+				Arrays.sort(sortedScores);
+			}
+			return sortedScores;
+		}
+
+		@Override
+		public int compareTo(MaximalBombLocationDamage o) {
+			int i = 0;
+			while (i < this.getScore().length && i < o.getScore().length) {
+				int diff = this.getScore()[i] - o.getScore()[i];
+				if (diff != 0) {
+					return diff;
+				}
+				i++;
+			}
+			if (i < this.getScore().length) {
+				return -1;
+			}
+			if (i < o.getScore().length) {
+				return 1;
+			}
+			return 0;
+		}
+		
+		
+		
+	}
+	
+	static class SubsetCoverage implements BombStrategy {
+		
+		private final Game game;
+		private final int maxRounds;
+		private final int maxBombs;
+		private final boolean solved;
+		private final Map<Integer, Location> bombLocationsForRound;
+		
+		public SubsetCoverage(Game game, int maxRounds, int maxBombs) {
+			this.game = new Game(game);
+			this.maxRounds = maxRounds;
+			this.maxBombs = maxBombs;
+			this.bombLocationsForRound = bombLocationsForRound();
+			this.solved = bombLocationsForRound != null;
+		}
+		
+		public Map<Integer, Location> bombLocationsForRound() {
+			Set<MaximalBombLocationDamage> findSubsetCoveringAllNodes = findSubsetCoveringAllNodes();
+			if (findSubsetCoveringAllNodes == null) {
+				return null;
+			}
+			List<MaximalBombLocationDamage> coveringSubset = new ArrayList<>(findSubsetCoveringAllNodes);
+			Collections.sort(coveringSubset, (m1, m2) -> m1.killerRounds.size() - m2.killerRounds.size());
+			List<List<Integer>> killerRounds = coveringSubset.stream().map(MaximalBombLocationDamage::getKillerRounds).collect(Collectors.toList());
+			killerRounds.forEach(Collections::sort);
+			int[] roundsIndices = new int[coveringSubset.size()];
+			int i = 0;
+			rounds:
+			while (i > -1 && i < roundsIndices.length) {
+				if (roundsIndices[i] == killerRounds.get(i).size()) {
+					i--;
+					continue;
+				}
+				Integer round = killerRounds.get(i).get(roundsIndices[i]);
+				roundsIndices[i]++;
+				for (int j = 0; j < i; j++) {
+					if (Math.abs(round - killerRounds.get(j).get(roundsIndices[j] - 1)) < 3) {
+						continue rounds;
+					}
+				}
+				i++;
+			}
+			if (i == -1) {
+				return null;
+			}
+			Map<Integer, Location> ret = new TreeMap<>();
+			for (i = 0; i< roundsIndices.length; i++) {
+				ret.put(killerRounds.get(i).get(roundsIndices[i] - 1), coveringSubset.get(i).bombLocation);
+			}
+			return ret;
+		}
+		
+		public Set<MaximalBombLocationDamage> findSubsetCoveringAllNodes() {
+			return findSubsetCoveringAllNodes(game.getNodes(), new ArrayList<>(findMaximalSubset()), maxBombs);
+		}
+		
+		private Set<MaximalBombLocationDamage> findSubsetCoveringAllNodes(Set<Node> allNodes, 
+				List<MaximalBombLocationDamage> maximalSubsets, int remainingBombs) {
+			if (allNodes.isEmpty()) {
+				return new HashSet<>();
+			}
+			if (maximalSubsets.isEmpty()) {
+				return null;
+			}
+			if (remainingBombs == 0) {
+				return null;
+			}
+			Collections.sort(maximalSubsets);
+			for (int i = 0; i < maximalSubsets.size(); i++) {
+				MaximalBombLocationDamage maximalBombLocationDamage = maximalSubsets.get(i);			
+				Set<Node> newlyNeedToCoverNodes = new HashSet<>(allNodes);
+				newlyNeedToCoverNodes.removeAll(maximalBombLocationDamage.killedNodesScores.keySet());
+				List<MaximalBombLocationDamage> newMaximalSubset = maximalSubsets.subList(i + 1, maximalSubsets.size())
+						.stream().map(MaximalBombLocationDamage::new).collect(Collectors.toList());
+				newMaximalSubset.forEach(maximalSubset -> maximalSubset.removeAll(maximalBombLocationDamage));
+				Set<MaximalBombLocationDamage> subsetCoveringNodes = 
+						findSubsetCoveringAllNodes(newlyNeedToCoverNodes, newMaximalSubset, remainingBombs - 1);
+				if (subsetCoveringNodes != null) {
+					subsetCoveringNodes.add(maximalBombLocationDamage);
+					return subsetCoveringNodes;
+				}
+			}
+			return null;
+		}
+		
+		public Set<MaximalBombLocationDamage> findMaximalSubset() {
+			Map<Node, Map<Location, Set<Integer>>> original = findNodeCoverage();
+			Map<Location, MaximalBombLocationDamage> map = new HashMap<>();
+			original.entrySet().forEach(myMapEntry -> myMapEntry.getValue().entrySet().forEach(entry -> {
+				MaximalBombLocationDamage currentMaximalRounds = map.get(entry.getKey());
+				if (currentMaximalRounds == null) {
+					currentMaximalRounds = new MaximalBombLocationDamage(entry.getKey(), entry.getValue());
+					map.put(entry.getKey(), currentMaximalRounds);
+				}
+				currentMaximalRounds.retainAll(entry.getValue());
+				currentMaximalRounds.addKilledNode(myMapEntry.getKey(), myMapEntry.getValue().size());
+			}));
+			return map.values().stream().filter(m -> !m.killerRounds.isEmpty()).collect(Collectors.toSet());
+		}
+		
+		public Map<Player.Node, Map<Location, Set<Integer>>> findNodeCoverage() {
+			Game game = new Player.Game(this.game);
+			Map<Node, Map<Location, Set<Integer>>> map = new HashMap<>();
+			Map<Integer, Map<Player.Location, Set<Player.Node>>> bombableLocationsInTime = new HashMap<>();
+			for (int i = game.round; i < maxRounds - 2; i++) {
+				bombableLocationsInTime.put(i, game.getBombableLocationsWithDamage());
+				game.nextRound();
+			}
+			game.getNodes().forEach(node -> map.put(node, reverseMap(findNodeCoverage(node, bombableLocationsInTime))));
+			return map;
+		}
+		
+		public Map<Location, Set<Integer>> reverseMap(Map<Integer, Set<Location>> mapWithSingleSolution) {
+			Map<Location, Set<Integer>> map = new HashMap<>();
+			mapWithSingleSolution.entrySet().forEach(entry ->
+				entry.getValue().stream().forEach(location -> {
+					Set<Integer> solutions = map.get(location);
+					if (solutions == null) {
+						solutions = new HashSet<>();
+						map.put(location, solutions);
+					}
+					solutions.add(entry.getKey());
+				})
+			);
+			return map;
+		}
+	
+		private Map<Integer, Set<Player.Location>> findNodeCoverage(Node node, 
+				Map<Integer, Map<Player.Location, Set<Node>>> bombableLocationsInTime) {
+			Map<Integer, Set<Player.Location>> map = new HashMap<>();
+			bombableLocationsInTime.entrySet().stream().forEach(entry -> {
+				entry.getValue().entrySet().stream().filter(entry1 -> entry1.getValue()
+						.contains(node)).forEach(entry1 -> {
+							Set<Player.Location> set = map.get(entry.getKey());
+							if (set == null) {
+								set = new HashSet<>();
+								map.put(entry.getKey(), set);
+							}
+							set.add(entry1.getKey());
+						});
+			});
+			return map;
+		}
+
+		@Override
+		public List<Location> getBombLocations() {
+			List<Location> bombs = new ArrayList<>();
+			for (int i = game.round; i < maxRounds; i++) {
+				bombs.add(bombLocationsForRound.get(i));
+			}
+			return bombs;
+		}
+
+		@Override
+		public boolean isSolved() {
+			return solved;
+		}
 		
 	}
 	

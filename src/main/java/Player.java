@@ -1,19 +1,10 @@
-import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -50,6 +41,34 @@ class Player {
 		}
 	}
 
+	static class ThorGiantsState {
+		private static final int MAX_STRIKE = 9;
+		private final Set<Location> giants;
+		private final Location thor;
+		private final int availableStrikes;
+		
+		public ThorGiantsState(Collection<Location> giants, Location thor, int availableStrikes) {
+			this.giants = new HashSet<>(giants);
+			this.thor = thor;
+			this.availableStrikes = availableStrikes;
+		}
+		
+		public boolean isSolved() {
+			return giants.isEmpty();
+		}
+		
+		public boolean isFailed() {
+			if (isSolved()) {
+				return false;
+			}
+			return availableStrikes == 0 || giants.contains(thor);
+		}
+
+		public Set<Location> strikableGiants() {
+			return giants.stream().filter(giant -> thor.distanceTo(giant) <= MAX_STRIKE).collect(Collectors.toSet());
+		}
+	}
+	
 	static class Location {
 		public static final Location BOTTOM_RIGHT = new Location(39, 17);
 
@@ -103,11 +122,20 @@ class Player {
 					}
 					ret.add(new Location(x, y));
 				}
-				
 			}
 			return ret;
 		}
 
+		public int distanceTo(Location other) {
+			return Math.max(Math.abs(x - other.x), Math.abs(y - other.y));
+		}
+
+		public Location moveTowards(Location other) {
+			if (this.equals(other)) {
+				return this;
+			}
+			return getNeighbors().stream().min((l1, l2) -> other.distanceTo(l1) - other.distanceTo(l2)).get();
+		}
 	}
 
 	interface MyCustomScanner {
@@ -152,4 +180,7 @@ class Player {
 		}
 	}
 
+	enum Action {
+		WAIT, STRIKE, N, E, S, W, NE, NW, SE, SW;
+	}
 }

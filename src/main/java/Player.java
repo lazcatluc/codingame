@@ -1,8 +1,15 @@
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -18,45 +25,124 @@ class Player {
 	}
 
 	protected static void run(MyCustomScanner in, PrintStream out) throws InterruptedException {
-		int thorX = in.nextInt();
-		int thorY = in.nextInt();
-
+		ThorGiantsState state = initState(in);
+		int maxExpansion = 20;
+		List<Action> actions = buildActions(state, maxExpansion);
+		int action = 0;
 		// game loop
 		while (true) {
-			int hammerStrikes = in.nextInt(); // the remaining number of hammer
-												// strikes.
-			int giants = in.nextInt(); // the number of giants which are still
-										// present on the map.
-			for (int i = 0; i < giants; i++) {
-				int giantX = in.nextInt();
-				int giantY = in.nextInt();
-			}
-
 			// Write an action using System.out.println()
 			// To debug: System.err.println("Debug messages...");
 
 			// The movement or action to be carried out: WAIT STRIKE N NE E SE S
 			// SW W or N
-			out.println("WAIT");
+			out.println(actions.get(action++));
+			state = state.nextState();
+			Location newThor = state.thor;
+			ThorGiantsState newState = buildInitialStateWithThor(in, newThor);
+			
+			if (!state.areGiantsAtLocations(newState.giants) || action == actions.size()) {
+				state = newState;
+				actions = buildActions(state, maxExpansion);
+				action = 0;
+			}
 		}
+	}
+	
+	protected static List<Action> buildActions(ThorGiantsState initialState, int maxExpansion) {
+		List<Action> actions = new ArrayList<>();
+		int expansions = 0;
+		while (Double.compare(initialState.score(), 0d) > 0d) {
+			initialState.expand();
+			expansions++;
+			if (expansions == maxExpansion) {
+				break;
+			}
+		}
+		Player.ThorGiantsState state = initialState;
+		while (state.isExpanded()) {
+			actions.add(state.nextAction());
+			state = state.nextState();
+		}
+		return actions;
+	}
+
+	protected static ThorGiantsState solve(PrintStream out, Player.MyCustomScanner in) {
+		ThorGiantsState initialState = initState(in);
+		while (Double.compare(initialState.score(), 0d) > 0d) {
+			initialState.expand();
+		}
+		Player.ThorGiantsState state = initialState;
+		while (state.isExpanded()) {
+			out.println(state.nextAction());
+			state.expand();
+			state = state.nextState();
+		}
+		return initialState;
+	}
+
+	protected static ThorGiantsState initState(MyCustomScanner in) {
+		int thorX = in.nextInt();
+		int thorY = in.nextInt();
+		Location thor = new Location(thorX, thorY);
+		return buildInitialStateWithThor(in, thor);
+	}
+
+	protected static ThorGiantsState buildInitialStateWithThor(MyCustomScanner in, Location thor) {
+		Set<Location> giants = new HashSet<>();
+		int hammerStrikes = in.nextInt(); // the remaining number of hammer
+											// strikes
+
+		int giantsCount = in.nextInt(); // the number of giants
+		for (int i = 0; i < giantsCount; i++) {
+			int giantX = in.nextInt();
+			int giantY = in.nextInt();
+			giants.add(new Location(giantX, giantY));
+		}
+		//System.err.println(in);
+		return new ThorGiantsState(giants, thor, hammerStrikes);
 	}
 
 	static class ThorGiantsState {
-		private static final int MAX_STRIKE = 9;
+		private static final int MAX_STRIKE = 4;
 		private final Set<Location> giants;
 		private final Location thor;
 		private final int availableStrikes;
-		
+		private Map<ThorGiantsState, Action> expandedStates;
+		private final Set<Location> strikableGiants;
+		private final int distanceToClosestStrikableGiant;
+		private final int distanceToFurthestNonStrikableGiant;
+
 		public ThorGiantsState(Collection<Location> giants, Location thor, int availableStrikes) {
 			this.giants = new HashSet<>(giants);
 			this.thor = thor;
 			this.availableStrikes = availableStrikes;
+			this.strikableGiants = strikableGiants();
+			this.distanceToClosestStrikableGiant = distanceToClosestStrikableGiant();
+			this.distanceToFurthestNonStrikableGiant = distanceToFurthestNonStrikableGiant();
 		}
-		
+
+		public boolean areGiantsAtLocations(Set<Location> newGiants) {
+			Set<Location> missingGiants = new HashSet<>(giants);
+			missingGiants.removeAll(newGiants);
+			Set<Location> extraGiants = new HashSet<>(newGiants);
+			extraGiants.removeAll(giants);
+			boolean fail = false;
+			if (!missingGiants.isEmpty()) {
+				fail = true;
+				System.err.println("Missing giants: "+missingGiants);
+			}
+			if (!extraGiants.isEmpty()) {
+				fail = true;
+				System.err.println("Extra giants: "+extraGiants);
+			}
+			return !fail;
+		}
+
 		public boolean isSolved() {
 			return giants.isEmpty();
 		}
-		
+
 		public boolean isFailed() {
 			if (isSolved()) {
 				return false;
@@ -64,11 +150,122 @@ class Player {
 			return availableStrikes == 0 || giants.contains(thor);
 		}
 
-		public Set<Location> strikableGiants() {
+		private Set<Location> strikableGiants() {
 			return giants.stream().filter(giant -> thor.distanceTo(giant) <= MAX_STRIKE).collect(Collectors.toSet());
 		}
+
+		public Set<Location> getStrikableGiants() {
+			return Collections.unmodifiableSet(strikableGiants);
+		}
+
+		private int distanceToClosestStrikableGiant() {
+			return strikableGiants().stream().map(thor::distanceTo).min((i1, i2) -> i1 - i2).orElse(MAX_STRIKE);
+		}
+
+		public int getDistanceToClosestStrikableGiant() {
+			return distanceToClosestStrikableGiant;
+		}
+
+		private int distanceToFurthestNonStrikableGiant() {
+			return giants.stream().map(thor::distanceTo).filter(i -> i > MAX_STRIKE).min((i1, i2) -> i1 - i2)
+					.orElse(MAX_STRIKE + 1);
+		}
+
+		public int getDistanceToFurthestNonStrikableGiant() {
+			return distanceToFurthestNonStrikableGiant;
+		}
+
+		public double score() {
+			if (isSolved()) {
+				return 0;
+			}
+			if (isFailed()) {
+				return Integer.MAX_VALUE;
+			}
+			if (expandedStates == null) {
+				return 1.0 * (giants.size() - strikableGiants.size()) / availableStrikes
+						+ distanceToFurthestNonStrikableGiant - distanceToClosestStrikableGiant;
+			}
+			return expandedStates.keySet().iterator().next().score();
+		}
+
+		public void expand() {
+			if (isSolved()) {
+				return;
+			}
+			
+			if (expandedStates == null) {
+				expandedStates = new LinkedHashMap<>();
+				thor.getValidActions().forEach(action -> {
+					ThorGiantsState state = expandWith(action);
+					expandedStates.put(state, action);
+				});
+			} else {
+				expandedStates.keySet().iterator().next().expand();
+			}
+			expandedStates = sortByScore(expandedStates);
+
+		}
+		
+		private Map<ThorGiantsState, Action> sortByScore(Map<ThorGiantsState, Action> original) {
+			Comparator<ThorGiantsState> stateComparator = (state1, state2) -> Double.compare(state1.score(),
+					state2.score());
+			List<ThorGiantsState> keys = new ArrayList<>(original.keySet());
+			Collections.sort(keys, stateComparator);
+			Map<ThorGiantsState, Action> ret = new LinkedHashMap<>();
+			keys.forEach(key -> ret.put(key, original.get(key)));
+			return ret;
+		}
+
+		private ThorGiantsState expandWith(Action action) {
+			List<Location> giants = new ArrayList<>(action == Action.STRIKE ? killCloseGiants() : this.giants);
+			Collections.sort(giants, (l1, l2) -> thor.distanceTo(l1) - thor.distanceTo(l2));
+			int newAvailableStrikes = action == Action.STRIKE ? (availableStrikes - 1) : availableStrikes;
+			Location newThor = thor.getNewLocationFor(action);
+			Set<Location> movedGiants = new HashSet<>();
+			Iterator<Location> giantsIt = giants.iterator();
+			while (giantsIt.hasNext()) {
+				Location giant = giantsIt.next();
+				Location newGiant = giant.moveTowards(newThor).getValue();
+				if (movedGiants.contains(newGiant) || giants.contains(newGiant)) {
+					movedGiants.add(giant);
+				} else {
+					movedGiants.add(newGiant);
+				}
+				giantsIt.remove();
+			}
+
+			return new ThorGiantsState(movedGiants, newThor, newAvailableStrikes);
+		}
+
+		private Set<Location> killCloseGiants() {
+			Set<Location> giants = new HashSet<>(this.giants);
+			giants.removeAll(getStrikableGiants());
+			return giants;
+		}
+
+		@Override
+		public String toString() {
+			return "ThorGiantsState [score=" + score() + ", giants=" + giants + ", thor=" + thor + ", availableStrikes="
+					+ availableStrikes + ", expandedStates=" + expandedStates + ", strikableGiants=" + strikableGiants
+					+ ", distanceToClosestStrikableGiant=" + distanceToClosestStrikableGiant
+					+ ", distanceToFurthestNonStrikableGiant=" + distanceToFurthestNonStrikableGiant + "]";
+		}
+
+		public boolean isExpanded() {
+			return expandedStates != null;
+		}
+
+		public ThorGiantsState nextState() {
+			return expandedStates.keySet().iterator().next();
+		}
+
+		public Action nextAction() {
+			return expandedStates.entrySet().iterator().next().getValue();
+		}
+
 	}
-	
+
 	static class Location {
 		public static final Location BOTTOM_RIGHT = new Location(39, 17);
 
@@ -110,19 +307,17 @@ class Player {
 			return "(" + x + "," + y + ")";
 		}
 
-		public Set<Location> getNeighbors() {
-			Set<Location> ret = new HashSet<>();
-			for (int x = this.x - 1; x < this.x + 2; x++) {
-				for (int y = this.y - 1; y < this.y + 2; y++) {
-					if (x == this.x && y == this.y) {
-						continue;
-					}
-					if (x < 0 || y < 0 || x > BOTTOM_RIGHT.x || y > BOTTOM_RIGHT.y) {
-						continue;
-					}
-					ret.add(new Location(x, y));
-				}
+		private void addIfValid(Action action, Location location, Map<Action, Location> locations) {
+			if (location.x < 0 || location.y < 0 || location.x > BOTTOM_RIGHT.x || location.y > BOTTOM_RIGHT.y) {
+				return;
 			}
+			locations.put(action, location);
+		}
+
+		public Map<Action, Location> getNeighbors() {
+			Map<Action, Location> ret = new LinkedHashMap<>();
+			Arrays.asList(Action.E, Action.W, Action.N, Action.S, Action.NE, Action.NW, Action.SE, Action.SW)
+					.forEach(action -> addIfValid(action, getNewLocationFor(action), ret));
 			return ret;
 		}
 
@@ -130,11 +325,52 @@ class Player {
 			return Math.max(Math.abs(x - other.x), Math.abs(y - other.y));
 		}
 
-		public Location moveTowards(Location other) {
+		public Map.Entry<Action, Location> moveTowards(Location other) {
 			if (this.equals(other)) {
+				return Collections.singletonMap(Action.WAIT, this).entrySet().iterator().next();
+			}
+			return getNeighbors().entrySet().stream()
+					.min((l1, l2) -> other.distanceTo(l1.getValue()) - other.distanceTo(l2.getValue())).get();
+		}
+
+		public Set<Action> getValidActions() {
+			Set<Action> valid = EnumSet.allOf(Action.class);
+			if (x == BOTTOM_RIGHT.x) {
+				valid.removeAll(Arrays.asList(Action.E, Action.SE, Action.NE));
+			}
+			if (x == 0) {
+				valid.removeAll(Arrays.asList(Action.W, Action.SW, Action.NW));
+			}
+			if (y == 0) {
+				valid.removeAll(Arrays.asList(Action.N, Action.NE, Action.NW));
+			}
+			if (y == BOTTOM_RIGHT.y) {
+				valid.removeAll(Arrays.asList(Action.S, Action.SE, Action.SW));
+			}
+			return valid;
+		}
+
+		public Location getNewLocationFor(Action action) {
+			switch (action) {
+			case N:
+				return new Location(x, y - 1);
+			case S:
+				return new Location(x, y + 1);
+			case E:
+				return new Location(x + 1, y);
+			case W:
+				return new Location(x - 1, y);
+			case NE:
+				return new Location(x + 1, y - 1);
+			case NW:
+				return new Location(x - 1, y - 1);
+			case SE:
+				return new Location(x + 1, y + 1);
+			case SW:
+				return new Location(x - 1, y + 1);
+			default:
 				return this;
 			}
-			return getNeighbors().stream().min((l1, l2) -> other.distanceTo(l1) - other.distanceTo(l2)).get();
 		}
 	}
 
@@ -178,6 +414,7 @@ class Player {
 		private void appendLine(int line, StringBuilder sb) {
 			sb.append("\"").append(lines.get(line).replaceAll("\"", "\\\"")).append("\"");
 		}
+
 	}
 
 	enum Action {

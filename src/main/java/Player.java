@@ -2,17 +2,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.IntUnaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 /**
  * Auto-generated code below aims at helping you parse the standard input
@@ -44,8 +49,8 @@ class Player {
 		ROOMS_BY_TYPE.put(13, new Room(new Path.Builder().from(Direction.LEFT).build()));
 	}
 
-	private static final int[] ROTATION_PERMUTATION = {0, 1, 3, 2, 5, 4, 7, 8, 9, 6, 11, 12, 13, 10}; 
-	
+	private static final int[] ROTATION_PERMUTATION = { 0, 1, 3, 2, 5, 4, 7, 8, 9, 6, 11, 12, 13, 10 };
+
 	public static void main(String args[]) {
 		Scanner in = new Scanner(System.in);
 		int width = in.nextInt(); // number of columns.
@@ -56,11 +61,11 @@ class Player {
 			String nextLine = in.nextLine();
 			System.err.println(nextLine);
 			String[] line = nextLine.split(" "); // represents a line in
-														// the grid and contains
-														// W integers. Each
-														// integer represents
-														// one room of a given
-														// type.
+													// the grid and contains
+													// W integers. Each
+													// integer represents
+													// one room of a given
+													// type.
 			for (int j = 0; j < width; j++) {
 				Rotation rotation = new Rotation.Builder().atX(j).atY(i).withRoomType(Integer.parseInt(line[j]))
 						.build();
@@ -75,22 +80,191 @@ class Player {
 		int yi = in.nextInt();
 		Direction initialDirection = Direction.valueOf(in.next());
 		Location initialLocation = new Location(xi, yi);
-		IndyState initialState = new IndyState.Builder().withRooms(rotations).startingAt(initialLocation).going(initialDirection).exitAt(exit).build();
-		while (initialState.score() > 0) {
-			initialState.expand();
-			//System.err.println(initialState);
-		}
+		AllRotationsSolver solver = new AllRotationsSolver.Builder().withRotations(rotations).startingAt(initialLocation)
+				.going(initialDirection).withExit(exit).build();
+		Iterator<Action> actions = solver.getActionsToExit().iterator().next().iterator();
 		// game loop
 		while (true) {
-			System.out.println(initialState.nextAction());
-			initialState = initialState.nextState();
-			xi = in.nextInt();
-			yi = in.nextInt();
-			initialLocation = new Location(xi, yi);
-			initialDirection = Direction.valueOf(in.next());
+			if (actions.hasNext()) {
+				System.out.println(actions.next());
+			}
+			else {
+				System.out.println("WAIT");
+			}
 		}
 	}
-	
+
+	static class AllRotationsSolver {
+		private final Location initialLocation;
+		private final Direction initialDirection;
+		private final Location exit;
+		private final Map<Location, Rotation> rotations;
+		private final Map<LocationWithDirection, List<Action>> reachableLocations = new TreeMap<>();
+
+		public AllRotationsSolver(Builder builder) {
+			this.initialLocation = builder.initialLocation;
+			this.initialDirection = builder.initialDirection;
+			this.exit = builder.exit;
+			this.rotations = new HashMap<>(builder.rotations);
+			fillReachableLocations();
+		}
+
+		public Set<List<Action>> getActionsToExit() {
+			return reachableLocations.entrySet().stream().filter(loc -> exit.equals(loc.getKey().getLocation()))
+					.map(Entry::getValue).collect(Collectors.toSet());
+		}
+
+		private void fillReachableLocations() {
+			Map<List<Action>, LocationWithDirection> locationsToParse = new TreeMap<>(Action.listCompare());
+			locationsToParse.put(Collections.emptyList(), new LocationWithDirection(initialLocation, initialDirection));
+
+			while (!locationsToParse.isEmpty()) {
+				Iterator<Entry<List<Action>, LocationWithDirection>> iterator = locationsToParse.entrySet().iterator();
+				Map.Entry<List<Action>, LocationWithDirection> locationToParse = iterator.next();
+				iterator.remove();
+				if (reachableLocations.containsKey(locationToParse.getValue())) {
+					continue;
+				}
+				List<Action> actionsUpToHere = locationToParse.getKey();
+				Location currentLocation = locationToParse.getValue().getLocation();
+				Direction currentDirection = locationToParse.getValue().getDirection();
+				Rotation rotation = rotations.get(currentLocation);
+
+				if (rotation == null) {
+					continue;
+				}
+				reachableLocations.put(locationToParse.getValue(), actionsUpToHere);
+				Set<Room> rooms = rotation.getRotatedRooms();
+				int roomRotation = -1;
+				for (Room room : rooms) {
+					roomRotation++;
+					Optional<Direction> nextDirectionReversed = room.getOut(currentDirection);
+					if (!nextDirectionReversed.isPresent()) {
+						continue;
+					}
+					Location nextLocation = nextDirectionReversed.get().transform(currentLocation);
+					Direction nextDirection = nextDirectionReversed.get().reverse();
+					LocationWithDirection nextLocationWithDirection = new LocationWithDirection(nextLocation,
+							nextDirection);
+					List<Action> actions = new ArrayList<>(actionsUpToHere);
+					actions.addAll(getActionsTo(currentLocation, roomRotation));
+					locationsToParse.put(actions, nextLocationWithDirection);
+				}
+			}
+		}
+
+		private List<Action> getActionsTo(Location location, int roomRotation) {
+			switch (roomRotation) {
+			case 0:
+				return Collections.emptyList();
+			case 1:
+				return Collections.singletonList(new Action(location, Direction.RIGHT));
+			case 2:
+				return Arrays.asList(new Action(location, Direction.RIGHT), new Action(location, Direction.RIGHT));
+			case 3:
+				return Collections.singletonList(new Action(location, Direction.LEFT));
+			default:
+				throw new IllegalArgumentException(String.valueOf(roomRotation));
+			}
+		}
+
+		static class Builder {
+			private Map<Location, Rotation> rotations;
+			private Location exit;
+			private Direction initialDirection;
+			private Location initialLocation;
+
+			public Builder startingAt(Location initialLocation) {
+				this.initialLocation = initialLocation;
+				return this;
+			}
+
+			public Builder going(Direction initialDirection) {
+				this.initialDirection = initialDirection;
+				return this;
+			}
+
+			public Builder withRotations(Map<Location, Rotation> rotations) {
+				this.rotations = rotations;
+				return this;
+			}
+
+			public Builder withExit(Location exit) {
+				this.exit = exit;
+				return this;
+			}
+
+			public AllRotationsSolver build() {
+				return new AllRotationsSolver(this);
+			}
+		}
+	}
+
+	static class LocationWithDirection implements Comparable<LocationWithDirection> {
+		private final Location location;
+		private final Direction direction;
+
+		public LocationWithDirection(Location location, Direction direction) {
+			this.location = location;
+			this.direction = direction;
+		}
+
+		// public LocationWithDirection next() {
+		// Location nextLocation = direction.transform(location);
+		// }
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((direction == null) ? 0 : direction.hashCode());
+			result = prime * result + ((location == null) ? 0 : location.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			LocationWithDirection other = (LocationWithDirection) obj;
+			if (direction != other.direction)
+				return false;
+			if (location == null) {
+				if (other.location != null)
+					return false;
+			} else if (!location.equals(other.location))
+				return false;
+			return true;
+		}
+
+		@Override
+		public String toString() {
+			return "Entering " + location + " from " + direction;
+		}
+
+		public Location getLocation() {
+			return location;
+		}
+
+		public Direction getDirection() {
+			return direction;
+		}
+
+		@Override
+		public int compareTo(LocationWithDirection o) {
+			int compareLocation = location.compareTo(o.location);
+			if (compareLocation != 0) {
+				return compareLocation;
+			}
+			return direction.compareTo(o.direction);
+		}
+
+	}
+
 	static class IndyState {
 		private final Direction currentDirection;
 		private final Location currentLocation;
@@ -100,7 +274,8 @@ class Player {
 		private final Map<Location, Rotation> rooms;
 		private final boolean solved;
 		private Map<IndyState, Action> expandedStates;
-		
+		private int expansions;
+
 		private IndyState(Builder builder) {
 			this.currentDirection = builder.currentDirection;
 			this.currentLocation = builder.currentLocation;
@@ -110,13 +285,13 @@ class Player {
 			this.solved = pathBuilder.isSolved();
 			Iterator<Location> locations = this.path.keySet().iterator();
 			Location finalLocation = currentLocation;
-			while(locations.hasNext()) {
+			while (locations.hasNext()) {
 				finalLocation = locations.next();
 			}
 			this.finalLocation = finalLocation;
 			this.rooms = new HashMap<>(builder.rooms);
 		}
-		
+
 		public Action nextAction() {
 			if (expandedStates == null || expandedStates.isEmpty()) {
 				return Action.WAIT;
@@ -127,7 +302,7 @@ class Player {
 		public boolean isSolved() {
 			return solved;
 		}
-		
+
 		public int score() {
 			if (isSolved()) {
 				return 0;
@@ -137,7 +312,7 @@ class Player {
 					return Integer.MAX_VALUE;
 				}
 				int nextStateScore = nextState().score();
-				return nextStateScore == 0 ? 0 : nextStateScore - 1;
+				return nextStateScore == 0 ? 0 : (/* expansions / 10 + */nextStateScore - 1);
 			}
 			return directScore();
 		}
@@ -149,83 +324,114 @@ class Player {
 			return expandedStates.keySet().iterator().next();
 		}
 
-		public void expand() {
+		public int expand() {
+			int ret;
 			if (score() == 0) {
-				return;
+				return -1;
 			}
 			if (expandedStates == null) {
 				expandedStates = new HashMap<>();
-				Optional<Direction> nextDirection = rooms.get(currentLocation).getRoom().getOut(currentDirection);
+				Rotation rotation = rooms.get(currentLocation);
+				if (rotation == null) {
+					return 0;
+				}
+				Optional<Direction> nextDirection = rotation.getRoom().getOut(currentDirection);
 				if (nextDirection.isPresent()) {
 					Set<Action> availableActions = getAvailableActions();
 					Location nextLocation = nextDirection.get().transform(currentLocation);
-					Builder nextStatesBuilder = new Builder().exitAt(exit).startingAt(nextLocation).going(nextDirection.get().reverse());
+					Builder nextStatesBuilder = new Builder().exitAt(exit).startingAt(nextLocation)
+							.going(nextDirection.get().reverse());
 					availableActions.forEach(action -> {
 						Map<Location, Rotation> newRooms = action.act(rooms);
 						expandedStates.put(nextStatesBuilder.withRooms(newRooms).build(), action);
 					});
 				}
-			}
-			else {
+				ret = 0;
+			} else {
 				if (expandedStates.isEmpty()) {
-					return;
+					return 0;
 				}
-				nextState().expand();
+				expansions++;
+				ret = expandedStates.keySet().stream().map(IndyState::expand).min((i1, i2) -> i1 - i2).get() + 1;
 			}
 			List<IndyState> nextStates = new ArrayList<>(expandedStates.keySet());
 			Collections.sort(nextStates, (s1, s2) -> s1.score() - s2.score());
 			Map<IndyState, Action> newExpandedStates = new LinkedHashMap<>();
 			nextStates.forEach(state -> newExpandedStates.put(state, expandedStates.get(state)));
 			expandedStates = newExpandedStates;
+			return ret;
 		}
-		
+
 		private Set<Action> getAvailableActions() {
 			Set<Action> actions = new HashSet<>();
 			actions.add(Action.WAIT);
-			rooms.entrySet().stream().filter(entry -> !exit.equals(entry.getKey())).filter(entry -> !currentLocation.equals(entry.getKey()))
+			rooms.entrySet().stream().filter(entry -> !exit.equals(entry.getKey()))
+					.filter(entry -> !currentLocation.equals(entry.getKey()))
 					.filter(entry -> !entry.getValue().isFixed()).filter(entry -> !entry.getValue().isConnectedTo(exit))
 					.filter(entry -> isCloseToCurrentLocation(entry.getKey())).forEach(entry -> {
-						actions.add(new Action(entry.getKey(), Direction.LEFT));
+						int currentRotation = entry.getValue().rotation;
+						if (currentRotation > 1) {
+							return;
+						}
 						actions.add(new Action(entry.getKey(), Direction.RIGHT));
+						if (currentRotation == 0) {
+							actions.add(new Action(entry.getKey(), Direction.LEFT));
+
+						}
 					});
-			
+
 			return actions;
 		}
 
 		private boolean isCloseToCurrentLocation(Location other) {
-			return Math.abs(other.x - currentLocation.x) + other.y - currentLocation.y == 1;
+			int maxExpand = 1;
+			boolean xCondition = Math.abs(other.x - currentLocation.x) <= maxExpand;
+			boolean yCondition = other.y - currentLocation.y <= maxExpand;
+			if (!xCondition || !yCondition) {
+				return false;
+			}
+			switch (currentDirection) {
+			case LEFT:
+				return other.y > currentLocation.y || (other.y == currentLocation.y && other.x > currentLocation.x);
+			case RIGHT:
+				return other.y > currentLocation.y || (other.y == currentLocation.y && other.x < currentLocation.x);
+			case TOP:
+				return other.y >= currentLocation.y && xCondition;
+			default:
+				throw new IllegalStateException();
+			}
 		}
-		
+
 		protected int directScore() {
-			return Integer.MAX_VALUE - path.size();
+			return rooms.size() - path.size();
 		}
-		
+
 		public static class Builder {
 			private Map<Location, Rotation> rooms;
 			private Location exit;
 			private Location currentLocation;
 			private Direction currentDirection;
-			
+
 			public Builder startingAt(Location currentLocation) {
 				this.currentLocation = currentLocation;
 				return this;
 			}
-			
+
 			public Builder going(Direction currentDirection) {
 				this.currentDirection = currentDirection;
 				return this;
 			}
-			
+
 			public Builder exitAt(Location exit) {
 				this.exit = exit;
 				return this;
 			}
-			
+
 			public Builder withRooms(Map<Location, Rotation> rooms) {
 				this.rooms = rooms;
 				return this;
 			}
-			
+
 			public IndyState build() {
 				return new IndyState(this);
 			}
@@ -233,24 +439,24 @@ class Player {
 
 		@Override
 		public String toString() {
-			return "IndyState [score=" + score() + ", currentDirection=" + currentDirection + ", currentLocation=" + currentLocation
-					+ ", exit=" + exit + ", finalLocation=" + finalLocation + ", path=" + path + ", rooms=" + rooms
-					+ ", solved=" + solved + ", expandedStates=" + expandedStates + "]";
+			return "IndyState [score=" + score() + ", currentDirection=" + currentDirection + ", currentLocation="
+					+ currentLocation + ", exit=" + exit + ", finalLocation=" + finalLocation + ", path=" + path
+					+ ", rooms=" + rooms + ", solved=" + solved + ", expandedStates=" + expandedStates + "]";
 		}
-		
+
 	}
-	
-	static class Action {
+
+	static class Action implements Comparable<Action> {
 		public static final Action WAIT = new Action(new Location(-1, -1), Direction.TOP) {
 			@Override
 			public String toString() {
 				return "WAIT";
 			}
 		};
-		
+
 		private final Location location;
 		private final Direction directionOfRotation;
-		
+
 		public Action(Location location, Direction directionOfRotation) {
 			this.location = location;
 			this.directionOfRotation = directionOfRotation;
@@ -260,7 +466,7 @@ class Player {
 		public String toString() {
 			return location.x + " " + location.y + " " + directionOfRotation;
 		}
-		
+
 		public Map<Location, Rotation> act(Map<Location, Rotation> original) {
 			Map<Location, Rotation> ret = new HashMap<>(original);
 			Rotation rotation = ret.get(location);
@@ -269,6 +475,62 @@ class Player {
 			}
 			return ret;
 		}
+
+		@Override
+		public int compareTo(Action o) {
+			int compareLocation = location.compareTo(o.location);
+			if (compareLocation != 0) {
+				return compareLocation;
+			}
+			return directionOfRotation.compareTo(o.directionOfRotation);
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((directionOfRotation == null) ? 0 : directionOfRotation.hashCode());
+			result = prime * result + ((location == null) ? 0 : location.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			Action other = (Action) obj;
+			if (directionOfRotation != other.directionOfRotation)
+				return false;
+			if (location == null) {
+				if (other.location != null)
+					return false;
+			} else if (!location.equals(other.location))
+				return false;
+			return true;
+		}
+
+		public static Comparator<List<Action>> listCompare() {
+			return (list1, list2) -> {
+				int sizeCompare = list1.size() - list2.size();
+				if (sizeCompare != 0) {
+					return sizeCompare;
+				}
+				int i = 0;
+				while (i < list1.size()) {
+					int compareElement = list1.get(i).compareTo(list2.get(i));
+					if (compareElement != 0) {
+						return compareElement;
+					}
+					i++;
+				}
+				return 0;
+			};
+
+		}
 	}
 
 	static class PathBuilder {
@@ -276,17 +538,18 @@ class Player {
 		private final Map<Location, Rotation> rotations;
 		private final Map<Location, Direction> path;
 
-		public PathBuilder(Location exit, Map<Location, Rotation> rotations, Location currentLocation, Direction currentDirection) {
+		public PathBuilder(Location exit, Map<Location, Rotation> rotations, Location currentLocation,
+				Direction currentDirection) {
 			this.exit = exit;
 			this.rotations = rotations;
 			this.path = new LinkedHashMap<>();
 			buildPath(currentLocation, currentDirection, this.path);
 		}
-		
+
 		public boolean isSolved() {
 			return path.containsKey(exit);
 		}
-		
+
 		public Map<Location, Direction> getPath() {
 			return Collections.unmodifiableMap(path);
 		}
@@ -304,17 +567,14 @@ class Player {
 			path.put(currentLocation, currentDirection);
 			if (exit.equals(currentLocation)) {
 				return;
-			}			
+			}
 			Location nextLocation = nextDirectionReversed.get().transform(currentLocation);
 			buildPath(nextLocation, nextDirectionReversed.get().reverse(), path);
 		}
 	}
 
 	enum Direction {
-		TOP(x -> x, y -> y - 1), 
-		RIGHT(x -> x + 1, y -> y), 
-		BOTTOM(x -> x, y -> y + 1), 
-		LEFT(x -> x - 1, y -> y);
+		TOP(x -> x, y -> y - 1), RIGHT(x -> x + 1, y -> y), BOTTOM(x -> x, y -> y + 1), LEFT(x -> x - 1, y -> y);
 
 		private final IntUnaryOperator transformX;
 		private final IntUnaryOperator transformY;
@@ -328,12 +588,17 @@ class Player {
 		}
 
 		public Direction reverse() {
-			switch(this) {
-			case TOP: return BOTTOM;
-			case RIGHT: return LEFT;
-			case LEFT: return RIGHT;
-			case BOTTOM: return TOP;
-			default: throw new IllegalStateException();
+			switch (this) {
+			case TOP:
+				return BOTTOM;
+			case RIGHT:
+				return LEFT;
+			case LEFT:
+				return RIGHT;
+			case BOTTOM:
+				return TOP;
+			default:
+				throw new IllegalStateException();
 			}
 		}
 
@@ -344,7 +609,7 @@ class Player {
 		public Location transform(Location other) {
 			return transformLocation.apply(other);
 		}
-		
+
 		public Direction rotate(int rotation) {
 			int realRotation = (rotation + ordinal()) % Direction.values().length;
 			return Direction.values()[realRotation];
@@ -410,6 +675,14 @@ class Player {
 			this.y = y;
 		}
 
+		public int compareTo(Location location) {
+			int compareY = y - location.y;
+			if (compareY != 0) {
+				return compareY;
+			}
+			return x - location.x;
+		}
+
 		@Override
 		public int hashCode() {
 			final int prime = 31;
@@ -462,9 +735,22 @@ class Player {
 
 		public boolean isConnectedTo(Location exit) {
 			Room room = getRoom();
-			
-			return Arrays.stream(Direction.values()).map(room::getOut)
-					.filter(Optional::isPresent).map(Optional::get).anyMatch(exit::equals);
+
+			return Arrays.stream(Direction.values()).map(room::getOut).filter(Optional::isPresent).map(Optional::get)
+					.anyMatch(exit::equals);
+		}
+
+		public Set<Room> getRotatedRooms() {
+			if (fixed) {
+				return Collections.singleton(getRoom());
+			}
+			Set<Room> rooms = new LinkedHashSet<>();
+			int type = roomType;
+			for (int i = 0; i < MAX_ROTATIONS; i++) {
+				rooms.add(ROOMS_BY_TYPE.get(type));
+				type = ROTATION_PERMUTATION[type];
+			}
+			return rooms;
 		}
 
 		public Room getRoom() {
@@ -473,7 +759,8 @@ class Player {
 				type = ROTATION_PERMUTATION[type];
 			}
 			if (type != roomType) {
-				System.err.println("Original type: "+roomType+"; finalType: "+type);
+				// System.err.println("Original type: "+roomType+"; finalType:
+				// "+type);
 			}
 			return ROOMS_BY_TYPE.get(type);
 		}
@@ -483,13 +770,16 @@ class Player {
 				throw new IllegalStateException();
 			}
 			Builder fromThis = new Rotation.Builder().from(this);
-			switch(direction) {
-				case LEFT: return fromThis.withRotation(rotation(-1)).build();
-				case RIGHT: return fromThis.withRotation(rotation(1)).build();
-				default: throw new IllegalArgumentException(direction.toString());
+			switch (direction) {
+			case LEFT:
+				return fromThis.withRotation(rotation(-1)).build();
+			case RIGHT:
+				return fromThis.withRotation(rotation(1)).build();
+			default:
+				throw new IllegalArgumentException(direction.toString());
 			}
 		}
-		
+
 		private int rotation(int i) {
 			return (rotation + i + MAX_ROTATIONS) % MAX_ROTATIONS;
 		}
@@ -500,7 +790,7 @@ class Player {
 			private int roomType;
 			private int rotation;
 			private boolean fixed;
-			
+
 			public Builder from(Rotation original) {
 				this.x = original.location.x;
 				this.y = original.location.y;
@@ -524,7 +814,7 @@ class Player {
 				this.roomType = Math.abs(type);
 				return type < 0 ? fixed() : rotating();
 			}
-			
+
 			public Builder withRotation(int rotation) {
 				this.rotation = rotation;
 				return this;
@@ -550,8 +840,7 @@ class Player {
 			return "Rotation [location=" + location + ", roomType=" + roomType + ", fixed=" + fixed + ", rotation="
 					+ rotation + "]";
 		}
-		
-		
+
 	}
 
 }

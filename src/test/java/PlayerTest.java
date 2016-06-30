@@ -1,8 +1,16 @@
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.junit.Test;
 
@@ -13,7 +21,7 @@ public class PlayerTest {
 		assertThat(new Player.Rotation.Builder().atX(2).atY(1).withRoomType(2).withRotation(1).build().getRoom()
 				.getOut(Player.Direction.TOP)).isEqualTo(Optional.of(Player.Direction.BOTTOM));
 	}
-	
+
 	@Test
 	public void nonRotatedRoomType2HasNoBottom() throws Exception {
 		assertThat(new Player.Rotation.Builder().atX(2).atY(1).withRoomType(2).build().getRoom()
@@ -35,7 +43,7 @@ public class PlayerTest {
 				new Player.Location(2, 0), Player.Direction.TOP);
 		assertThat(pathBuilder.isSolved()).isTrue();
 	}
-	
+
 	@Test
 	public void solvesPathWithOneRotation() throws Exception {
 		Map<Player.Location, Player.Rotation> rotations = new HashMap<>();
@@ -46,7 +54,7 @@ public class PlayerTest {
 		rotations.put(new Player.Location(2, 0), top);
 		rotations.put(new Player.Location(2, 1), middle);
 		rotations.put(new Player.Location(2, 2), bottom);
-		
+
 		Player.Direction initialDirection = Player.Direction.TOP;
 		Player.Location initialLocation = new Player.Location(2, 0);
 		Player.IndyState initialState = new Player.IndyState.Builder().withRooms(rotations).startingAt(initialLocation)
@@ -55,32 +63,59 @@ public class PlayerTest {
 		initialState.expand();
 		assertThat(initialState.score()).isEqualTo(0);
 	}
-	
+
 	@Test
 	public void solvesBrokenSewer() throws Exception {
-		int[][] input = {
-				{0, -3,0,0,0,0, 0,0},
-				{0, 12,3,3,2,3,12,0},
-				{0,  0,0,0,0,0, 2,0},
-				{0,-12,3,2,2,3,13,0}
-				};
-		Map<Player.Location, Player.Rotation> rotations = new HashMap<>();
-		for (int y = 0; y < input.length; y++) {
-			for (int x = 0; x < input[y].length; x++) {
-				rotations.put(new Player.Location(x, y), new Player.Rotation.Builder().atX(x).atY(y).withRoomType(input[y][x]).build());
-			}
-		}
-		
+		int[][] input = { { 0, -3, 0, 0, 0, 0, 0, 0 }, { 0, 12, 3, 3, 2, 3, 12, 0 }, { 0, 0, 0, 0, 0, 0, 2, 0 },
+				{ 0, -12, 3, 2, 2, 3, 13, 0 } };
+		Map<Player.Location, Player.Rotation> rotations = buildRotations(input);
+
 		Player.Location exit = new Player.Location(1, 3);
 		Player.Direction initialDirection = Player.Direction.TOP;
 		Player.Location initialLocation = new Player.Location(1, 0);
 		Player.IndyState initialState = new Player.IndyState.Builder().withRooms(rotations).startingAt(initialLocation)
 				.going(initialDirection).exitAt(exit).build();
 		int rounds = 0;
-		while (initialState.score() > 0 && rounds++<100) {
+		while (initialState.score() > 0 && rounds++ < 100) {
 			initialState.expand();
 		}
-		
+
 		assertThat(initialState.score()).isEqualTo(0);
 	}
+
+	protected Map<Player.Location, Player.Rotation> buildRotations(int[][] input) {
+		Map<Player.Location, Player.Rotation> rotations = new HashMap<>();
+		for (int y = 0; y < input.length; y++) {
+			for (int x = 0; x < input[y].length; x++) {
+				rotations.put(new Player.Location(x, y),
+						new Player.Rotation.Builder().atX(x).atY(y).withRoomType(input[y][x]).build());
+			}
+		}
+		return rotations;
+	}
+
+	@Test
+	public void solvesBrokenMausoleum() throws Exception {
+		int[][] input = { 
+				{ -3, 12, 8, 6, 3, 2, 7, 2, 7, 0, 0, 0, 0 }, 
+				{ 11, 5, 13, 0, 0, 0, 3, 0, 3, 0, 0, 0, 0 },
+				{ 0, 11, 2, 2, 3, 3, 8, 2, -9, 2, 3, 13, 0 }, 
+				{ 0, 0, 0, 0, 0, 12, 8, 3, 1, 3, 2, 7, 0 },
+				{ 0, 0, 11, 2, 3, 1, 5, 2, 10, 0, 0, 11, 13 }, 
+				{ 0, 0, 3, 0, 0, 6, 8, 0, 0, 0, 0, 0, 2 },
+				{ 0, 0, 11, 3, 3, 10, 11, 2, 3, 2, 3, 2, 8 }, 
+				{ 0, 12, 6, 3, 2, 3, 3, 6, 3, 3, 2, 3, 12 },
+				{ 0, 11, 4, 2, 3, 2, 2, 11, 12, 13, 13, 13, 0 }, 
+				{ 0, 0, -3, 12, 7, 8, 13, 13, 4, 5, 4, 10, 0 } };
+		Map<Player.Location, Player.Rotation> rotations = buildRotations(input);
+		Player.Location exit = new Player.Location(2, 9);
+		Player.Direction initialDirection = Player.Direction.TOP;
+		Player.Location initialLocation = new Player.Location(0, 0);
+		Player.AllRotationsSolver solver = new Player.AllRotationsSolver.Builder().withExit(exit)
+				.startingAt(initialLocation).going(initialDirection).withRotations(rotations).build();
+
+		assertThat(solver.getActionsToExit()).isNotEmpty();
+		System.out.println(solver.getActionsToExit());
+	}
+
 }

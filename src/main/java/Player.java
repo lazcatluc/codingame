@@ -122,7 +122,52 @@ class Player {
 			this.path = builder.path;
 		}
 		
-		public Map<LocationWithDirection, Location> rocksIntersectingIndy() {
+		public Action getNextAction() {
+			
+			List<Action> correctedActions = new ArrayList<>();
+			for (Action action : actions) {
+				
+			}
+			Map<LocationWithDirection, Set<Location>> locationsThatCouldBeRotated = locationsThatCouldBeRotatedInOrderToAvoidRocks();
+			return actions.get(0);
+		}
+		
+		private Set<Location> locationsThatCouldBeRotatedInOrderToAvoid(LocationWithDirection rock, Location intersectionWithIndy) {
+			Set<Location> set = new LinkedHashSet<>();
+			Map<Location, Direction> rockPath = new PathBuilder(exit, rotations, rock.location, rock.direction).getPath();
+			Iterator<Map.Entry<Location, Direction>> rockLocations = rockPath.entrySet().iterator();
+			rockLocations.next();
+			while (rockLocations.hasNext()) {
+				Map.Entry<Location, Direction> nextLocationWithDirection = rockLocations.next();
+				Location nextLocation = nextLocationWithDirection.getKey();
+				Direction nextDirection = nextLocationWithDirection.getValue();
+				if (intersectionWithIndy.equals(nextLocation)) {
+					break;
+				}
+				if (path.containsKey(nextLocation)) {
+					continue;
+				}
+				Rotation nextRotatedLocation = rotations.get(nextLocation);
+				if (nextRotatedLocation.isFixed()) {
+					continue;
+				}
+				if (nextRotatedLocation.rotate(Direction.RIGHT).getRoom().getOut(nextDirection).isPresent() && 
+					nextRotatedLocation.rotate(Direction.LEFT).getRoom().getOut(nextDirection).isPresent()) {
+					continue;
+				}
+				set.add(nextLocation);
+			}
+			return set;
+		}
+		
+		public Map<LocationWithDirection, Set<Location>> locationsThatCouldBeRotatedInOrderToAvoidRocks() {
+			Map<LocationWithDirection, Set<Location>> map = new HashMap<>();
+			rocksIntersectingIndy().forEach((rock, intersectionWithIndy) -> map.put(rock,
+					locationsThatCouldBeRotatedInOrderToAvoid(rock, intersectionWithIndy)));
+			return map;
+		}
+		
+		private Map<LocationWithDirection, Location> rocksIntersectingIndy() {
 			Map<LocationWithDirection, Location> map = new HashMap<>();
 			rocks.stream().forEach(rockStart -> {
 				Optional<Location> intersect = intersectIndyPath(rockStart);

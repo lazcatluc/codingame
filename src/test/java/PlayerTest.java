@@ -1,5 +1,6 @@
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,13 +131,12 @@ public class PlayerTest {
 				.startingAt(initialLocation).going(initialDirection).withRotations(rotations).build();
 
 		assertThat(solver.getActionsToExit()).isNotEmpty();
-		List<Player.Action> actions = solver.getActionsToExit().iterator().next();
-		for (Player.Action action : actions) {
-			rotations = action.act(rotations);
-		}
-		System.out.println(actions);
-		System.out.println(new Player.PathBuilder(exit, rotations, initialLocation, initialDirection).getPath());
-		System.out.println(new Player.PathBuilder(exit, rotations, new Player.Location(9, 2), Player.Direction.RIGHT).getPath());
+		
+		Player.RockSolver rockSolver = new Player.RockSolver.Builder().fromAllRotationsSolver(solver)
+				.withRocks(Collections.singleton(new Player.LocationWithDirection(new Player.Location(9, 2), Player.Direction.RIGHT)))
+				.build();
+		System.out.println(rockSolver.locationsThatCouldBeRotatedInOrderToAvoidRocks());
+
 	}
 
 }

@@ -1,16 +1,9 @@
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
 
 import org.junit.Test;
 
@@ -116,6 +109,34 @@ public class PlayerTest {
 
 		assertThat(solver.getActionsToExit()).isNotEmpty();
 		System.out.println(solver.getActionsToExit());
+	}
+	
+	@Test
+	public void solvesRocks() throws Exception {
+		int[][] input ={
+				{0,	0,	0,	0,	0,	0,	0,	0,	-3,	0},
+				{0,	7,	-2,	3,	-2,	3,	-2,	3,	11,	0},
+				{0,	-7,	-2,	2,	2,	2,	2,	2,	2,	-2},
+				{0,	6,	-2,	2,	2,	2,	2,	2,	2,	-2},
+				{0,	-7,	-2,	2,	2,	2,	2,	2,	2,	-2},
+				{0,	8,	-2,	2,	2,	2,	2,	2,	2,	-2},
+				{0,	-7,	-2,	2,	2,	2,	2,	2,	2,	-2},
+				{0,	-3,	0,	0,	0,	0,	0,	0,	0,	0}};
+		Map<Player.Location, Player.Rotation> rotations = buildRotations(input);
+		Player.Location exit = new Player.Location(1, 7);
+		Player.Direction initialDirection = Player.Direction.TOP;
+		Player.Location initialLocation = new Player.Location(8, 1);
+		Player.AllRotationsSolver solver = new Player.AllRotationsSolver.Builder().withExit(exit)
+				.startingAt(initialLocation).going(initialDirection).withRotations(rotations).build();
+
+		assertThat(solver.getActionsToExit()).isNotEmpty();
+		List<Player.Action> actions = solver.getActionsToExit().iterator().next();
+		for (Player.Action action : actions) {
+			rotations = action.act(rotations);
+		}
+		System.out.println(actions);
+		System.out.println(new Player.PathBuilder(exit, rotations, initialLocation, initialDirection).getPath());
+		System.out.println(new Player.PathBuilder(exit, rotations, new Player.Location(9, 2), Player.Direction.RIGHT).getPath());
 	}
 
 }

@@ -8,10 +8,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
@@ -91,9 +93,111 @@ class Player {
 			else {
 				System.out.println("WAIT");
 			}
+			//Indy
+			System.err.println(in.nextLine());
+			
+			int rocks = in.nextInt();
+			System.err.println(rocks);
+			in.nextLine();
+			for (int i = 0; i < rocks; i++) {
+				System.err.println(in.nextLine());
+			}
+			
 		}
 	}
 
+	static class RockSolver {
+		private final List<Action> actions;
+		private final Location exit;
+		private final Map<Location, Rotation> rotations;
+		private final List<LocationWithDirection> rocks;
+		private final Map<Location, Direction> path;
+		
+		public RockSolver(Builder builder) {
+			this.actions = builder.actions;
+			this.exit = builder.exit;
+			Map<Location, Rotation> rotations = builder.rotations;
+			this.rotations = rotations;
+			this.rocks = builder.rocks;
+			this.path = builder.path;
+		}
+		
+		public Map<LocationWithDirection, Location> rocksIntersectingIndy() {
+			Map<LocationWithDirection, Location> map = new HashMap<>();
+			rocks.stream().forEach(rockStart -> {
+				Optional<Location> intersect = intersectIndyPath(rockStart);
+				if (intersect.isPresent()) {
+					map.put(rockStart, intersect.get());
+				}
+			});
+			return map;
+		}
+		
+		private Optional<Location> intersectIndyPath(LocationWithDirection rockStart) {
+			Map<Location, Direction> rockPath = new PathBuilder(exit, rotations, rockStart.location, rockStart.direction).getPath();
+			Iterator<Location> indyLocation = path.keySet().iterator();
+			Iterator<Location> rockLocation = rockPath.keySet().iterator();
+			while (indyLocation.hasNext() && rockLocation.hasNext()) {
+				Location indy = indyLocation.next();
+				Location rock = rockLocation.next();
+				if (indy.equals(rock)) {
+					return Optional.of(indy);
+				}
+			}
+			return Optional.empty();
+		}
+		
+		public static class Builder {
+			private List<Action> actions;
+			private Location exit;
+			private Map<Location, Rotation> rotations;
+			private List<LocationWithDirection> rocks = Collections.emptyList();
+			private Map<Location, Direction> path;
+			
+			public Builder fromAllRotationsSolver(AllRotationsSolver solver) {
+				withActions(solver.getActionsToExit().iterator().next());
+				withExit(solver.exit);
+				Map<Location, Rotation> rotations = solver.rotations;
+				for (Action action : actions) {
+					rotations = action.act(rotations);
+				}
+				withRotations(rotations);
+				PathBuilder pathBuilder = new PathBuilder(solver.exit, rotations, solver.initialLocation, solver.initialDirection);
+				withPath(pathBuilder.getPath());
+				return this;
+			}
+			
+			public Builder withActions(Collection<Action> actions) {
+				this.actions = new ArrayList<>(actions);
+				return this;
+			}
+			
+			public Builder withExit(Location exit) {
+				this.exit = exit;
+				return this;
+			}
+			
+			public Builder withRotations(Map<Location, Rotation> rotations) {
+				this.rotations = new HashMap<>(rotations);
+				return this;
+			}
+			
+			public Builder withRocks(Collection<LocationWithDirection> rocks) {
+				this.rocks = new ArrayList<>(rocks);
+				return this;
+			}
+			
+			public Builder withPath(Map<Location, Direction> path) {
+				this.path = new LinkedHashMap<>(path);
+				return this;
+			}
+			
+			public RockSolver build() {
+				return new RockSolver(this);
+			}
+		}
+	}
+	
 	static class AllRotationsSolver {
 		private final Location initialLocation;
 		private final Direction initialDirection;

@@ -1,3 +1,4 @@
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -8,12 +9,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
@@ -54,55 +53,123 @@ class Player {
 	private static final int[] ROTATION_PERMUTATION = { 0, 1, 3, 2, 5, 4, 7, 8, 9, 6, 11, 12, 13, 10 };
 
 	public static void main(String args[]) {
-		Scanner in = new Scanner(System.in);
-		int width = in.nextInt(); // number of columns.
-		int height = in.nextInt(); // number of rows.
-		Map<Location, Rotation> rotations = new HashMap<>();
-		in.nextLine();
-		for (int i = 0; i < height; i++) {
-			String nextLine = in.nextLine();
-			System.err.println(nextLine);
-			String[] line = nextLine.split(" "); // represents a line in
-													// the grid and contains
-													// W integers. Each
-													// integer represents
-													// one room of a given
-													// type.
-			for (int j = 0; j < width; j++) {
-				Rotation rotation = new Rotation.Builder().atX(j).atY(i).withRoomType(Integer.parseInt(line[j]))
-						.build();
-				rotations.put(rotation.location, rotation);
-			}
-		}
-		int exitX = in.nextInt(); // the coordinate along the X axis of the exit
-									// (not useful for this first mission, but
-									// must be read).
-		Location exit = new Location(exitX, height - 1);
-		int xi = in.nextInt();
-		int yi = in.nextInt();
-		Direction initialDirection = Direction.valueOf(in.next());
-		Location initialLocation = new Location(xi, yi);
-		AllRotationsSolver solver = new AllRotationsSolver.Builder().withRotations(rotations).startingAt(initialLocation)
-				.going(initialDirection).withExit(exit).build();
-		Iterator<Action> actions = solver.getActionsToExit().iterator().next().iterator();
+		MyScanner in = new MyCustomScanner(new Scanner(System.in));
+		PrintStream out = System.out;
+		run(in, out);
+	}
+
+	private static void run(MyScanner in, PrintStream out) {
+		Runner runner = new Runner(in);
 		// game loop
 		while (true) {
-			if (actions.hasNext()) {
-				System.out.println(actions.next());
-			}
-			else {
-				System.out.println("WAIT");
-			}
-			//Indy
-			System.err.println(in.nextLine());
-			
-			int rocks = in.nextInt();
-			System.err.println(rocks);
+			runner.loop(out);
+		}
+	}
+
+	static class Runner {
+		private final MyScanner in;
+		private final int width;
+		private final int height;
+		private final Location exit;
+		private final Map<Location, Rotation> rotations;
+		private final Location initialLocation;
+		private final Direction initialDirection;
+		private final AllRotationsSolver solver;
+		private RockSolver rockSolver;
+
+		public Runner(MyScanner in) {
+			this.in = in;
+			width = in.nextInt(); // number of columns.
+			height = in.nextInt(); // number of rows.
+			rotations = new HashMap<>();
 			in.nextLine();
-			for (int i = 0; i < rocks; i++) {
-				System.err.println(in.nextLine());
+			for (int i = 0; i < height; i++) {
+				String nextLine = in.nextLine();
+				String[] line = nextLine.split(" "); // represents a line in
+				// the grid and contains
+				// W integers. Each
+				// integer represents
+				// one room of a given
+				// type.
+				for (int j = 0; j < width; j++) {
+					Rotation rotation = new Rotation.Builder().atX(j).atY(i)
+							.withRoomType(Integer.parseInt(line[j])).build();
+					rotations.put(rotation.location, rotation);
+				}
 			}
-			
+			int exitX = in.nextInt(); // the coordinate along the X axis of the exit
+			// (not useful for this first mission, but
+			// must be read).
+			exit = new Location(exitX, height - 1);
+			int xi = in.nextInt();
+			int yi = in.nextInt();
+			initialDirection = Direction.valueOf(in.next());
+			initialLocation = new Location(xi, yi);
+			solver = new AllRotationsSolver.Builder().withRotations(rotations)
+					.startingAt(initialLocation).going(initialDirection).withExit(exit).build();
+
+			rockSolver = new RockSolver.Builder().fromAllRotationsSolver(solver).build();
+			in.nextLine(); // empty
+			in.nextLine(); // zero rocks
+		}
+
+		public void loop(PrintStream out) {
+			System.err.println(in);
+			out.println(rockSolver.getNextAction());
+			//Indy
+			in.nextLine();
+			int rocks = in.nextInt();
+			in.nextLine();
+			List<LocationWithDirection> newRocks = new ArrayList<>(rocks);
+			for (int i = 0; i < rocks; i++) {
+				newRocks.add(new LocationWithDirection(in.nextLine()));
+			}
+
+			rockSolver = rockSolver.next(newRocks);
+		}
+
+		public RockSolver getRockSolver() {
+			return rockSolver;
+		}
+	}
+
+	interface MyScanner {
+		int nextInt();
+		String nextLine();
+		String next();
+	}
+
+	static class MyCustomScanner implements MyScanner {
+		private final List<String> lines = new ArrayList<>();
+		private final Scanner scanner;
+
+		public MyCustomScanner(Scanner scanner) {
+			this.scanner = scanner;
+		}
+
+		public int nextInt() {
+			int nextInt = scanner.nextInt();
+			lines.add(String.valueOf(nextInt));
+			return nextInt;
+		}
+
+		public String nextLine() {
+			String nextLine = scanner.nextLine();
+			lines.add(nextLine);
+			return nextLine;
+		}
+
+		public String next() {
+			String next = scanner.next();
+			lines.add(next);
+			return next;
+		}
+
+		@Override
+		public String toString() {
+			StringBuilder sb = new StringBuilder();
+			lines.forEach(line -> sb.append(line).append('\n'));
+			return sb.toString();
 		}
 	}
 
@@ -112,6 +179,8 @@ class Player {
 		private final Map<Location, Rotation> rotations;
 		private final List<LocationWithDirection> rocks;
 		private final Map<Location, Direction> path;
+		private final Map<LocationWithDirection, Set<LocationWithDirection>> locationsThatCouldBeRotatedInOrderToAvoidRocks;
+		private final boolean firstActionMustBeExecutedImmediately;
 		
 		public RockSolver(Builder builder) {
 			this.actions = builder.actions;
@@ -120,20 +189,68 @@ class Player {
 			this.rotations = rotations;
 			this.rocks = builder.rocks;
 			this.path = builder.path;
+			this.locationsThatCouldBeRotatedInOrderToAvoidRocks = locationsThatCouldBeRotatedInOrderToAvoidRocks();
+			this.firstActionMustBeExecutedImmediately = firstActionMustBeExecutedImmediately();
+		}
+
+		public RockSolver next(Collection<LocationWithDirection> newRocks) {
+			List<Action> newActions = new ArrayList<>(actions);
+			if (firstActionMustBeExecutedImmediately) {
+				newActions.remove(0);
+			}
+
+			Map<Location, Direction> newPath = new LinkedHashMap<>(path);
+			Iterator<Entry<Location, Direction>> iterator = newPath.entrySet().iterator();
+			iterator.next();
+			iterator.remove();
+
+			return new Builder().withExit(exit).withActions(newActions)
+					.withRotations(getNextAction().act(rotations))
+					.withRocks(newRocks).withPath(newPath).build();
+
+		}
+
+		private boolean firstActionMustBeExecutedImmediately() {
+			if (actions.isEmpty()) {
+				return false;
+			}
+			Action action = actions.get(0);
+			Iterator<Entry<Location, Direction>> iterator = path.entrySet().iterator();
+			iterator.next();
+			if (!iterator.hasNext()) {
+				//System.err.println("Only one entry in path");
+				return true;
+			}
+			Entry<Location, Direction> secondLocation = iterator.next();
+			if (action.location.equals(secondLocation.getKey())) {
+				//System.err.println(action.location+" equals "+secondLocation);
+				return true;
+			}
+			boolean locationsThatCouldBeRotatedInOrderToAvoidRocksEmpty =
+					locationsThatCouldBeRotatedInOrderToAvoidRocks.isEmpty();
+			if (locationsThatCouldBeRotatedInOrderToAvoidRocksEmpty) {
+				//System.err.println("No locations that could be rotated");
+			}
+			return locationsThatCouldBeRotatedInOrderToAvoidRocksEmpty;
 		}
 		
 		public Action getNextAction() {
-			
-			List<Action> correctedActions = new ArrayList<>();
-			for (Action action : actions) {
-				
+			if (firstActionMustBeExecutedImmediately) {
+				return actions.get(0);
 			}
-			Map<LocationWithDirection, Set<Location>> locationsThatCouldBeRotated = locationsThatCouldBeRotatedInOrderToAvoidRocks();
-			return actions.get(0);
+			if (locationsThatCouldBeRotatedInOrderToAvoidRocks.isEmpty()) {
+				return Action.WAIT;
+			}
+			Iterator<LocationWithDirection> iterator = locationsThatCouldBeRotatedInOrderToAvoidRocks
+					.entrySet().iterator().next().getValue().iterator();
+			if (!iterator.hasNext()) {
+				return Action.WAIT;
+			}
+			return new Action(iterator.next());
 		}
 		
-		private Set<Location> locationsThatCouldBeRotatedInOrderToAvoid(LocationWithDirection rock, Location intersectionWithIndy) {
-			Set<Location> set = new LinkedHashSet<>();
+		private Set<LocationWithDirection> locationsThatCouldBeRotatedInOrderToAvoid(LocationWithDirection rock, Location intersectionWithIndy) {
+			Set<LocationWithDirection> set = new LinkedHashSet<>();
 			Map<Location, Direction> rockPath = new PathBuilder(exit, rotations, rock.location, rock.direction).getPath();
 			Iterator<Map.Entry<Location, Direction>> rockLocations = rockPath.entrySet().iterator();
 			rockLocations.next();
@@ -151,17 +268,21 @@ class Player {
 				if (nextRotatedLocation.isFixed()) {
 					continue;
 				}
-				if (nextRotatedLocation.rotate(Direction.RIGHT).getRoom().getOut(nextDirection).isPresent() && 
-					nextRotatedLocation.rotate(Direction.LEFT).getRoom().getOut(nextDirection).isPresent()) {
+				if (!nextRotatedLocation.rotate(Direction.RIGHT).getRoom()
+						.getOut(nextDirection).isPresent()) {
+					set.add(new LocationWithDirection(nextLocation, Direction.RIGHT));
 					continue;
 				}
-				set.add(nextLocation);
+				if (!nextRotatedLocation.rotate(Direction.LEFT).getRoom()
+						.getOut(nextDirection).isPresent()) {
+					set.add(new LocationWithDirection(nextLocation, Direction.LEFT));
+				}
 			}
 			return set;
 		}
 		
-		public Map<LocationWithDirection, Set<Location>> locationsThatCouldBeRotatedInOrderToAvoidRocks() {
-			Map<LocationWithDirection, Set<Location>> map = new HashMap<>();
+		private Map<LocationWithDirection, Set<LocationWithDirection>> locationsThatCouldBeRotatedInOrderToAvoidRocks() {
+			Map<LocationWithDirection, Set<LocationWithDirection>> map = new HashMap<>();
 			rocksIntersectingIndy().forEach((rock, intersectionWithIndy) -> map.put(rock,
 					locationsThatCouldBeRotatedInOrderToAvoid(rock, intersectionWithIndy)));
 			return map;
@@ -175,11 +296,14 @@ class Player {
 					map.put(rockStart, intersect.get());
 				}
 			});
+			//System.err.println("Rocks intersecting indy: "+ map);
 			return map;
 		}
 		
 		private Optional<Location> intersectIndyPath(LocationWithDirection rockStart) {
 			Map<Location, Direction> rockPath = new PathBuilder(exit, rotations, rockStart.location, rockStart.direction).getPath();
+			//System.err.println("Trying path: "+rockPath);
+			//System.err.println("Indy's path: "+path);
 			Iterator<Location> indyLocation = path.keySet().iterator();
 			Iterator<Location> rockLocation = rockPath.keySet().iterator();
 			while (indyLocation.hasNext() && rockLocation.hasNext()) {
@@ -191,7 +315,26 @@ class Player {
 			}
 			return Optional.empty();
 		}
-		
+
+		public boolean isFirstActionMustBeExecutedImmediately() {
+			return firstActionMustBeExecutedImmediately;
+		}
+
+		public List<LocationWithDirection> getRocks() {
+			return rocks;
+		}
+
+		@Override
+		public String toString() {
+			return "RockSolver{" +
+					"actions=" + actions +
+					", path=" + path +
+					", rocks=" + rocks +
+					", firstActionMustBeExecutedImmediately=" + firstActionMustBeExecutedImmediately +
+					", locationsThatCouldBeRotatedInOrderToAvoidRocks=" + locationsThatCouldBeRotatedInOrderToAvoidRocks +
+					'}';
+		}
+
 		public static class Builder {
 			private List<Action> actions;
 			private Location exit;
@@ -356,6 +499,12 @@ class Player {
 		public LocationWithDirection(Location location, Direction direction) {
 			this.location = location;
 			this.direction = direction;
+		}
+
+		public LocationWithDirection(String line) {
+			String[] data = line.split("\\s");
+			this.location = new Location(Integer.parseInt(data[0]), Integer.parseInt(data[1]));
+			this.direction = Direction.valueOf(data[2]);
 		}
 
 		// public LocationWithDirection next() {
@@ -606,6 +755,10 @@ class Player {
 		private final Location location;
 		private final Direction directionOfRotation;
 
+		public Action(LocationWithDirection locationWithDirection) {
+			this(locationWithDirection.location, locationWithDirection.direction);
+		}
+
 		public Action(Location location, Direction directionOfRotation) {
 			this.location = location;
 			this.directionOfRotation = directionOfRotation;
@@ -621,6 +774,7 @@ class Player {
 			Rotation rotation = ret.get(location);
 			if (rotation != null) {
 				ret.put(location, rotation.rotate(directionOfRotation));
+				System.err.println("Rotating "+location+" "+directionOfRotation);
 			}
 			return ret;
 		}

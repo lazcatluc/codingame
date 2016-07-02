@@ -1,10 +1,8 @@
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.*;
 
 import org.junit.Test;
 
@@ -126,17 +124,130 @@ public class PlayerTest {
 		Map<Player.Location, Player.Rotation> rotations = buildRotations(input);
 		Player.Location exit = new Player.Location(1, 7);
 		Player.Direction initialDirection = Player.Direction.TOP;
-		Player.Location initialLocation = new Player.Location(8, 1);
+		Player.Location initialLocation = new Player.Location(8, 0);
 		Player.AllRotationsSolver solver = new Player.AllRotationsSolver.Builder().withExit(exit)
 				.startingAt(initialLocation).going(initialDirection).withRotations(rotations).build();
 
 		assertThat(solver.getActionsToExit()).isNotEmpty();
-		
+		System.out.println(solver.getActionsToExit());
 		Player.RockSolver rockSolver = new Player.RockSolver.Builder().fromAllRotationsSolver(solver)
-				.withRocks(Collections.singleton(new Player.LocationWithDirection(new Player.Location(9, 2), Player.Direction.RIGHT)))
 				.build();
-		System.out.println(rockSolver.locationsThatCouldBeRotatedInOrderToAvoidRocks());
-
+		System.out.println(rockSolver.getNextAction());
+		System.out.println(rockSolver.isFirstActionMustBeExecutedImmediately());
+		rockSolver = rockSolver.next(Collections.singleton(
+				new Player.LocationWithDirection(new Player.Location(9, 2), Player.Direction.RIGHT)
+		));
+		System.out.println(rockSolver.getNextAction());
+		System.out.println(rockSolver.isFirstActionMustBeExecutedImmediately());
+		rockSolver = rockSolver.next(Arrays.asList(
+			new Player.LocationWithDirection(new Player.Location(8, 2), Player.Direction.RIGHT),
+			new Player.LocationWithDirection(new Player.Location(9, 3), Player.Direction.RIGHT)
+		));
+		System.out.println(rockSolver.getNextAction());
+		System.out.println(rockSolver.isFirstActionMustBeExecutedImmediately());
+		rockSolver = rockSolver.next(Arrays.asList(
+				new Player.LocationWithDirection(new Player.Location(7, 2), Player.Direction.RIGHT),
+				new Player.LocationWithDirection(new Player.Location(8, 3), Player.Direction.RIGHT),
+				new Player.LocationWithDirection(new Player.Location(9, 4), Player.Direction.RIGHT)
+		));
+		System.out.println(rockSolver.getNextAction());
+		System.out.println(rockSolver.isFirstActionMustBeExecutedImmediately());
 	}
 
+	@Test
+	public void runsWithInput() throws Exception {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		PrintStream out = new PrintStream(baos);
+		LinesScanner input = new LinesScanner(Arrays.asList(
+				"10",
+				"8",
+				"",
+				"0 0 0 0 0 0 0 0 -3 0",
+				"0 7 -2 3 -2 3 -2 3 11 0",
+				"0 -7 -2 2 2 2 2 2 2 -2",
+				"0 6 -2 2 2 2 2 2 2 -2",
+				"0 -7 -2 2 2 2 2 2 2 -2",
+				"0 8 -2 2 2 2 2 2 2 -2",
+				"0 -7 -2 2 2 2 2 2 2 -2",
+				"0 -3 0 0 0 0 0 0 0 0",
+				"1",
+				"8",
+				"0",
+				"TOP",
+				"",
+				"0",
+				"",
+				"8 1 TOP",
+				"1",
+				"",
+				"9 2 RIGHT",
+				"7 1 RIGHT",
+				"2",
+				"",
+				"8 2 RIGHT",
+				"9 3 RIGHT",
+				"6 1 RIGHT",
+				"3",
+				"",
+				"7 2 RIGHT",
+				"8 3 RIGHT",
+				"9 4 RIGHT",
+				"5 1 RIGHT",
+				"4",
+				"",
+				"6 2 RIGHT",
+				"7 3 RIGHT",
+				"8 4 RIGHT",
+				"9 5 RIGHT",
+				"4 1 RIGHT",
+				"5",
+				"",
+				"5 2 RIGHT",
+				"6 3 RIGHT",
+				"7 4 RIGHT",
+				"8 5 RIGHT",
+				"9 6 RIGHT",
+				"3 1 RIGHT",
+				"5",
+				"",
+				"4 2 RIGHT",
+				"5 3 RIGHT",
+				"6 4 RIGHT",
+				"7 5 RIGHT",
+				"8 6 RIGHT",
+				"2 1 RIGHT",
+				"5",
+				"",
+				"3 2 RIGHT",
+				"4 3 RIGHT",
+				"5 4 RIGHT",
+				"6 5 RIGHT",
+				"7 6 RIGHT",
+				"1 1 RIGHT",
+				"5",
+				"",
+				"2 2 RIGHT",
+				"3 3 RIGHT",
+				"4 4 RIGHT",
+				"5 5 RIGHT",
+				"6 6 RIGHT"
+		));
+
+		Player.Runner runner = new Player.Runner(input);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+		System.out.println(runner.getRockSolver());
+		runner.loop(out);
+
+		System.out.println(runner.getRockSolver());
+		System.out.println(baos.toString());
+	}
 }

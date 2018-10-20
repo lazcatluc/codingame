@@ -11,10 +11,13 @@ public class PlayerTest {
 
     @Test
     public void solvesInputOutput() throws Exception {
-        Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources", "input.txt")));
-        String output = Files.lines(Paths.get("src", "main", "resources", "output.txt")).reduce(new StringBuilder(),
-                (sb, s) -> sb.append(s).append("\n"),
-                StringBuilder::append).toString();
+        solvesInputOutput("");
+    }
+    private void solvesInputOutput(String which) throws Exception {
+        Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
+                "input" + which + ".txt")));
+        String output = Files.lines(Paths.get("src", "main", "resources", "output" + which + ".txt"))
+                .reduce(new StringBuilder(), (sb, s) -> sb.append(s).append("\n"), StringBuilder::append).toString();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(baos);
         Player.run(in, out);

@@ -16,7 +16,21 @@ class Player {
     }
 
     static void run(MyScanner in, PrintStream out) {
+        for (int i = 0; i < 10; i++) {
+            String line = in.next();
+        }
+        int robotCount = in.nextInt();
+        for (int i = 0; i < robotCount; i++) {
+            int x = in.nextInt();
+            int y = in.nextInt();
+            String direction = in.next();
+        }
 
+        // Write an action using System.out.println()
+        // To debug: System.err.println("Debug messages...");
+
+        out.println("14 4 L");
+        System.err.println(in);
     }
 
     interface MyScanner {

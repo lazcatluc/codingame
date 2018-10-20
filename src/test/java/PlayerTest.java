@@ -18,8 +18,8 @@ public class PlayerTest {
     public void findsOneRobot() throws Exception {
         Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
                 "input.txt")));
-        Player.Game game = Player.init(in);
-        assertThat(game.getRobots().size()).isEqualTo(1);
+        Player.GameRound gameRound = Player.init(in);
+        assertThat(gameRound.getRobots().size()).isEqualTo(1);
     }
 
     private void solvesInputOutput(String which) throws Exception {

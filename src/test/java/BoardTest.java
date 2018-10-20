@@ -1,5 +1,10 @@
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -101,6 +106,21 @@ public class BoardTest {
         board.readLine(1, ".R.");
         board.readLine(2, "...");
         assertThat(board.getNextNode(node)).isEqualTo(new Player.Node(2, 1, 'R'));
+    }
+
+    @Test
+    public void printsEmptyBoard() throws Exception {
+        emptyBoard();
+        assertThat(board.toString()).isEqualToIgnoringWhitespace("...\n...\n...\n");
+    }
+
+    @Test
+    public void expandsBoardBoard() throws Exception {
+        emptyBoard();
+        Map<Player.Node, Player.Board> boards = board.expand(new Player.Node(1, 1, 'U'));
+        Set<String> boardsToString = boards.values().stream().map(Player.Board::toString).collect(Collectors.toSet());
+        assertThat(boardsToString).isEqualTo(new HashSet<>(Arrays.asList(
+                "...\n.D.\n...\n", "...\n.R.\n...\n", "...\n.L.\n...\n")));
     }
 
     private void emptyBoard() {

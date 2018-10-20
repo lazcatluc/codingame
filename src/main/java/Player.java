@@ -53,7 +53,7 @@ class Player {
             gameRound = nextRound.get();
             time = System.currentTimeMillis();
         } while (outputBuilder.length() <= MAX_OUTPUT_LENTGH && time - initialTime < MILLISECONDS_ALLOWED);
-        out.print(outputBuilder.toString());
+        out.println(outputBuilder.toString());
     }
 
     static GameRound init(MyScanner in) {

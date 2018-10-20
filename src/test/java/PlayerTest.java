@@ -18,7 +18,7 @@ public class PlayerTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(baos);
         Player.run(in, out);
-        assertThat(new String(baos.toByteArray(), Charset.forName("UTF-8"))).isEqualTo(output);
+        assertThat(new String(baos.toByteArray(), Charset.forName("UTF-8"))).isEqualToIgnoringWhitespace(output);
     }
 
 }

@@ -13,6 +13,15 @@ public class PlayerTest {
     public void solvesInputOutput() throws Exception {
         solvesInputOutput("");
     }
+
+    @Test
+    public void findsOneRobot() throws Exception {
+        Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
+                "input.txt")));
+        Player.Game game = Player.init(in);
+        assertThat(game.getRobots().size()).isEqualTo(1);
+    }
+
     private void solvesInputOutput(String which) throws Exception {
         Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
                 "input" + which + ".txt")));

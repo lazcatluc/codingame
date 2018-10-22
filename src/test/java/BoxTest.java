@@ -13,7 +13,7 @@ public class BoxTest {
                 "...##...###..#...",
                 ".####..#####.###.",
                 "######.##########");
-        Player.Box box = new Player.Box(5, 17, lines);
+        Solution.Box box = new Solution.Box(5, 17, lines);
         assertThat(box.getLines()).isEqualTo(lines);
     }
 }

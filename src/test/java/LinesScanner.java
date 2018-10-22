@@ -3,7 +3,7 @@ import java.util.List;
 /**
  * Created by Catalin on 7/2/2016.
  */
-public class LinesScanner implements Player.MyScanner {
+public class LinesScanner implements Solution.MyScanner {
     private final List<String> lines;
     private int line = 0;
 

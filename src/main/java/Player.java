@@ -2,6 +2,8 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Auto-generated code below aims at helping you parse the standard input
@@ -16,6 +18,16 @@ class Player {
     }
 
     static void run(MyScanner in, PrintStream out) {
+        String[] firstLine = in.nextLine().split(" ");
+        int width = Integer.parseInt(firstLine[0]);
+        int height = Integer.parseInt(firstLine[1]);
+        int tumbles = in.nextInt();
+        List<String> lines = IntStream.range(0, height).mapToObj(i -> in.nextLine()).collect(Collectors.toList());
+        Box box = new Box(height, width, lines);
+        for (int i = 0; i < tumbles; i++) {
+            box = box.tumble();
+        }
+        box.getLines().forEach(out::println);
         System.err.println(in);
     }
 
@@ -24,14 +36,21 @@ class Player {
         private final int width;
         private final int[] level;
 
+        Box(int height, int width, int[] level) {
+            this.height = height;
+            this.width = width;
+            this.level = new int[level.length];
+            System.arraycopy(level, 0, this.level, 0, level.length);
+        }
+
         Box(int height, int width, List<String> lines) {
             this.height = height;
             this.width = width;
             this.level = new int[width];
             int currentLevel = height;
-            for (String line : lines) {
+            for (int j = 0; j < height; j++) {
                 for (int i = 0; i < width; i++) {
-                    char current = line.charAt(i);
+                    char current = lines.get(j).charAt(i);
                     if (current == '#' && level[i] == 0) {
                         level[i] = currentLevel;
                     }
@@ -54,6 +73,18 @@ class Player {
                 lines.add(lineBuilder.toString());
             }
             return lines;
+        }
+
+        Box tumble() {
+            int[] newLevels = new int[level.length];
+            for(int currentLevel = height; currentLevel > 0; currentLevel--) {
+                for (int i = 0; i < width; i++) {
+                    if (level[i] >= currentLevel) {
+                        newLevels[height - currentLevel]++;
+                    }
+                }
+            }
+            return new Box(width, height, newLevels);
         }
     }
 

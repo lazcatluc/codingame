@@ -16,7 +16,7 @@ class Player {
     }
 
     static void run(MyScanner in, PrintStream out) {
-
+        System.err.println(in);
     }
 
     interface MyScanner {
@@ -29,7 +29,7 @@ class Player {
         private final List<String> lines = new ArrayList<>();
         private final Scanner scanner;
 
-        public MyCustomScanner(Scanner scanner) {
+        MyCustomScanner(Scanner scanner) {
             this.scanner = scanner;
         }
 

@@ -15,13 +15,13 @@ public class PlayerTest {
     }
 
     private void solvesInputOutput(String which) throws Exception {
-        Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
+        Solution.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
                 "input" + which + ".txt")));
         String output = Files.lines(Paths.get("src", "main", "resources", "output" + which + ".txt"))
                 .reduce(new StringBuilder(), (sb, s) -> sb.append(s).append("\n"), StringBuilder::append).toString();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(baos);
-        Player.run(in, out);
+        Solution.run(in, out);
         assertThat(new String(baos.toByteArray(), Charset.forName("UTF-8"))).isEqualToIgnoringWhitespace(output);
     }
 

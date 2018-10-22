@@ -6,6 +6,6 @@ public class PieceTest {
     @Test
     public void readsPiece() {
         String input = "0 c1";
-        assertThat(new Player.Piece(input).toString()).isEqualTo("Piece{color=WHITE, x=c, y=1}");
+        assertThat(new Player.Rook(input).toString()).isEqualTo("Piece{color=WHITE, x=c, y=1}");
     }
 }

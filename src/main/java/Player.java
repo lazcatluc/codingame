@@ -19,6 +19,44 @@ class Player {
         System.err.println(in);
     }
 
+    static class Box {
+        private final int height;
+        private final int width;
+        private final int[] level;
+
+        Box(int height, int width, List<String> lines) {
+            this.height = height;
+            this.width = width;
+            this.level = new int[width];
+            int currentLevel = height;
+            for (String line : lines) {
+                for (int i = 0; i < width; i++) {
+                    char current = line.charAt(i);
+                    if (current == '#' && level[i] == 0) {
+                        level[i] = currentLevel;
+                    }
+                }
+                currentLevel--;
+            }
+        }
+
+        List<String> getLines() {
+            List<String> lines = new ArrayList<>();
+            for(int currentLevel = height; currentLevel > 0; currentLevel--) {
+                StringBuilder lineBuilder = new StringBuilder();
+                for (int i = 0; i < width; i++) {
+                    if (level[i] >= currentLevel) {
+                        lineBuilder.append('#');
+                    } else {
+                        lineBuilder.append('.');
+                    }
+                }
+                lines.add(lineBuilder.toString());
+            }
+            return lines;
+        }
+    }
+
     interface MyScanner {
         int nextInt();
         String nextLine();

@@ -19,6 +19,33 @@ class Player {
         System.err.println(in);
     }
 
+    static class Piece {
+        enum Color {
+            WHITE,
+            BLACK
+        }
+
+        private final Color color;
+        private final char x;
+        private final int y;
+
+        public Piece(String line) {
+            color = line.charAt(0) == '0' ? Color.WHITE : Color.BLACK;
+            x = line.charAt(2);
+            y = line.charAt(3) - '0';
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("Piece{");
+            sb.append("color=").append(color);
+            sb.append(", x=").append(x);
+            sb.append(", y=").append(y);
+            sb.append('}');
+            return sb.toString();
+        }
+    }
+
     interface MyScanner {
         int nextInt();
         String nextLine();

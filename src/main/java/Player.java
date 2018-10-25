@@ -21,6 +21,7 @@ class Player {
 
     interface MyScanner {
         int nextInt();
+        float nextFloat();
         String nextLine();
         String next();
     }
@@ -37,6 +38,12 @@ class Player {
             int nextInt = scanner.nextInt();
             lines.add(String.valueOf(nextInt));
             return nextInt;
+        }
+
+        public float nextFloat() {
+            float nextFloat = scanner.nextFloat();
+            lines.add(String.valueOf(nextFloat));
+            return nextFloat;
         }
 
         public String nextLine() {

@@ -17,6 +17,11 @@ public class LinesScanner implements Player.MyScanner {
     }
 
     @Override
+    public float nextFloat() {
+        return Float.parseFloat(nextLine());
+    }
+
+    @Override
     public String nextLine() {
         return lines.get(line++);
     }

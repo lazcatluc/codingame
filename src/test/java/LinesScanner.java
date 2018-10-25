@@ -1,3 +1,4 @@
+import java.io.PrintStream;
 import java.util.List;
 
 /**
@@ -29,5 +30,10 @@ public class LinesScanner implements Player.MyScanner {
     @Override
     public String next() {
         return nextLine();
+    }
+
+    @Override
+    public void print(PrintStream printStream) {
+        lines.forEach(printStream::println);
     }
 }

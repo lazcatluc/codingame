@@ -16,7 +16,7 @@ class Player {
     }
 
     static void run(MyScanner in, PrintStream out) {
-        System.err.println(in);
+        in.print(System.err);
     }
 
     interface MyScanner {
@@ -24,6 +24,7 @@ class Player {
         float nextFloat();
         String nextLine();
         String next();
+        void print(PrintStream printStream);
     }
 
     static class MyCustomScanner implements MyScanner {
@@ -63,6 +64,10 @@ class Player {
             StringBuilder sb = new StringBuilder();
             lines.forEach(line -> sb.append(line).append('\n'));
             return sb.toString();
+        }
+
+        public void print(PrintStream out) {
+            lines.forEach(out::println);
         }
     }
 

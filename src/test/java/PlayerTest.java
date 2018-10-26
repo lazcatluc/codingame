@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import org.junit.Test;
 
 public class PlayerTest {
@@ -14,15 +15,20 @@ public class PlayerTest {
         solvesInputOutput("");
     }
 
+    @Test
+    public void solvesInputOutput03() throws Exception {
+        solvesInputOutput("03");
+    }
+
     private void solvesInputOutput(String which) throws Exception {
-        Player.MyScanner in = new LinesScanner(Files.readAllLines(Paths.get("src", "main", "resources",
-                "input" + which + ".txt")));
-        String output = Files.lines(Paths.get("src", "main", "resources", "output" + which + ".txt"))
-                .reduce(new StringBuilder(), (sb, s) -> sb.append(s).append("\n"), StringBuilder::append).toString();
+        List<String> lines = Files.readAllLines(Paths.get("src", "main", "resources",
+                "input" + which + ".txt"));
+        Player.MyScanner in = new LinesScanner(lines);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(baos);
         Player.run(in, out);
-        assertThat(new String(baos.toByteArray(), Charset.forName("UTF-8"))).isEqualToIgnoringWhitespace(output);
+        assertThat(new String(baos.toByteArray(), Charset.forName("UTF-8")).split("\\s+").length)
+                .isEqualTo(Integer.parseInt(lines.get(0)));
     }
 
 }

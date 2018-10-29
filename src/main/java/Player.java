@@ -36,6 +36,24 @@ class Player {
         }
     }
 
+    static class TrafficLight {
+        private final int metersFromOrigin;
+        private final int secondsGreen;
+
+        TrafficLight(int metersFromOrigin, int secondsGreen) {
+            this.metersFromOrigin = metersFromOrigin;
+            this.secondsGreen = secondsGreen;
+        }
+
+        boolean isGreen(Speed speed) {
+            return isGreen((int)Math.floor(speed.seconds(metersFromOrigin)));
+        }
+
+        boolean isGreen(int second) {
+            return (second / secondsGreen) % 2 == 0;
+        }
+    }
+
     interface MyScanner {
         int nextInt();
         float nextFloat();

@@ -19,6 +19,23 @@ class Player {
         in.print(System.err);
     }
 
+    static class Speed {
+        private static final double KPH_DIVIDED_BY_MPS = 10.0 / 36.0;
+        private final double metersPerSecond;
+
+        Speed(int kilometersPerHour) {
+            this.metersPerSecond = kilometersPerHour * KPH_DIVIDED_BY_MPS;
+        }
+
+        double meters(int second) {
+            return metersPerSecond * second;
+        }
+
+        double seconds(int meters) {
+            return meters / metersPerSecond;
+        }
+    }
+
     interface MyScanner {
         int nextInt();
         float nextFloat();
